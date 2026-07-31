@@ -1,4 +1,4 @@
-import { Theme, Status } from "@/generated/prisma";
+import { Theme, Status } from "@prisma/client";
 
 export const THEME_LABELS: Record<Theme, string> = {
   AI_INFRA_SEMIS: "AI Infra / Semis",

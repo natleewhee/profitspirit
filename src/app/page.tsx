@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Candidate } from "@/lib/types";
-import { Status } from "@/generated/prisma";
+import { Status } from "@prisma/client";
 import { CandidateTable } from "@/components/CandidateTable";
 import { FilterBar } from "@/components/FilterBar";
 

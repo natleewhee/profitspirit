@@ -1,4 +1,4 @@
-import { Status } from "@/generated/prisma";
+import { Status } from "@prisma/client";
 import { STATUS_LABELS } from "@/lib/labels";
 
 const STYLES: Record<Status, string> = {

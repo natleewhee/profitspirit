@@ -1,4 +1,4 @@
-import { Theme, Status } from "@/generated/prisma";
+import { Theme, Status } from "@prisma/client";
 
 export type Candidate = {
   id: string;

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Candidate } from "@/lib/types";
-import { Status } from "@/generated/prisma";
+import { Status } from "@prisma/client";
 import { THEME_LABELS, STATUS_OPTIONS } from "@/lib/labels";
 import { StatusBadge } from "./StatusBadge";
 
