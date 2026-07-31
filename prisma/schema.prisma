@@ -1,0 +1,36 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Theme {
+  AI_INFRA_SEMIS
+  NON_TECH_ASYMMETRIC
+  SGX
+  OTHER
+}
+
+enum Status {
+  NEW
+  RESEARCHED
+  ADDED_TO_WATCHLIST
+  ADDED_TO_PORTFOLIO
+  PASSED
+}
+
+model Candidate {
+  id            String   @id @default(cuid())
+  ticker        String
+  dateScanned   DateTime
+  theme         Theme
+  triggerReason String
+  status        Status   @default(NEW)
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
