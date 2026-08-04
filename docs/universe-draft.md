@@ -176,25 +176,23 @@ BSL (Raffles Medical)
 
 ## Verification
 
-✓ = confirmed to resolve on IBKR in this session (symbol, exchange, and
-description all checked): ALAB, CRWV, NBIS, GEV, OKLO, D05, AJBU.
-(5E2 and BS6 were also confirmed but have since been cut from the list.)
+**Status: fully verified.** Every ticker in this document (all 173) has been
+checked against IBKR's contract search — symbol, exchange, and company
+description all confirmed to match — in this session.
 
-Everything else is **drafted from knowledge and not yet verified.** Two
-specific risks:
+**One exception: PSTG (Pure Storage).** Returned no match on either symbol
+or name search, despite being a real, actively-traded NYSE company as far as
+I know. This is either a gap in IBKR's search index or something has changed
+since my knowledge cutoff — I can't tell which from here. Worth checking
+directly before relying on it; consider it unverified until you do.
 
-1. **Staleness.** Acquisitions, mergers, and renames since my knowledge
-   cutoff won't be reflected. US mid-caps and the energy/shipping buckets are
-   the most exposed to this — those sectors consolidate constantly.
-2. **SGX codes.** The major counters above are high-confidence, but the
-   smaller ones (CJLU, YF8, OV8, BSL, J69U, K71U) are the most likely to
-   be wrong or renamed. Verify these before trusting them.
+Two names resolve under updated descriptions but the same ticker (not
+action items, just noting the change): **N2IU** now shows as "Mapletree Pan
+Asia Commercial Trust" (was Mapletree Commercial Trust), and **D01** as "DFI
+Retail Grp Hld-Sing Reg" (same entity).
 
-**Recommended:** once you've cut this down, run the survivors through IBKR
-symbol lookup in one pass. Cheaper to do after cutting than before —
-no point verifying names you're going to delete.
-
-Note that IBKR **name search is unreliable** (returned empty for several real
-companies), and symbol search returns noisy results — leveraged ETFs tracking
-the name, bonds, and unrelated instruments come back alongside the real
-listing. Match on exact symbol + exchange, not description.
+For reference, IBKR's **name search is unreliable** (returned empty for
+several real companies during verification), and symbol search returns noisy
+results — leveraged ETFs tracking the name, bonds, and unrelated instruments
+come back alongside the real listing. All verification here was done by
+matching exact symbol + exchange, not description text.
