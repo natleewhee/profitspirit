@@ -53,13 +53,13 @@ CRWV ✓, NBIS ✓, APLD, IREN, CIFR, WULF, CORZ
 EQIX, DLR
 
 ### Electrical & thermal infrastructure
-VRT, ETN, PWR, HUBB, NVT, GEV ✓, MOD, GNRC
+VRT, ETN, NVT, GEV ✓,
 
 ### Power generation with datacenter exposure
-CEG, VST, TLN, NRG
+CEG, VST, TLN
 
 ### Nuclear / SMR
-BWXT, SMR, OKLO ✓, LEU
+BWXT, SMR, OKLO ✓
 
 > **Note on the last two buckets:** power is where AI-infra and "non-tech
 > asymmetric" genuinely overlap. I've put the datacenter-demand angle here and
@@ -77,11 +77,11 @@ inside are replaceable; the reasoning shouldn't be.
 
 ### Uranium & fuel cycle
 *Supply deficit against inelastic demand; small sector, large moves.*
-CCJ, UEC, UUUU, DNN, NXE, LEU
+CCJ, UEC, UUUU, DNN
 
 ### Energy E&P
 *High operating leverage to commodity price; bounded downside at strip.*
-DVN, FANG, APA, OVV, MTDR, MUR, CHRD, RRC, AR, EQT
+DVN, FANG, APA, MUR, CHRD, RRC, AR, EQT
 
 ### Oil services
 *Capital cycle — underinvestment period, pricing power on recovery.*
@@ -89,19 +89,19 @@ SLB, HAL, BKR, WFRD, RIG, VAL, NOV
 
 ### Shipping & tankers
 *Extreme cyclicality; rate spikes are non-linear vs. asset value.*
-FRO, STNG, DHT, INSW, TNK, GNK, SBLK, ZIM, MATX
+FRO, STNG, DHT, SBLK, ZIM, MATX
 
 ### Industrial metals & mining
 *Electrification demand vs. multi-year supply lead times.*
-FCX, SCCO, TECK, HBM, AA, CLF, X, MP, ALB
+FCX, CLF, X, MP, ALB
 
 ### Precious metals
 *Tail hedge; convex to real rates and currency stress.*
-NEM, AEM, KGC, AU, WPM, FNV, RGLD
+NEM, AEM, KGC, RGLD
 
 ### Fertiliser & agriculture
 *Food security + input cost cycles; episodic, violent re-ratings.*
-MOS, CF, NTR, IPI, ADM, BG
+MOS, CF, NTR
 
 ### Defence & aerospace
 *Structural multi-year demand shift; long backlogs.*
@@ -113,7 +113,7 @@ AIG, CB, TRV, RNR, EG, AXS, KNSL
 
 ### Homebuilders & building products
 *Rate-sensitive with structural undersupply underneath.*
-DHI, LEN, PHM, TOL, BLDR, MAS, OC
+DHI, LEN, PHM, TOL
 
 ### Airlines
 *Operating leverage; small load-factor moves swing earnings hard.*
@@ -121,7 +121,7 @@ DAL, UAL, LUV, ALK
 
 ### Pharma & biotech
 *Patent cliffs and pipeline events — genuinely binary, size accordingly.*
-PFE, BMY, MRK, ABBV, GILD, VTRS, JAZZ, EXEL, HALO
+PFE, BMY, MRK, ABBV, GILD
 
 ### LatAm / EM
 *Currency and political discount vs. hard assets.*
@@ -145,7 +145,6 @@ Z74 (Singtel), CC3 (StarHub), CJLU (NetLink NBN Trust)
 
 ### Industrial / marine / offshore
 BN4 (Keppel), U96 (Sembcorp Industries), S63 (ST Engineering),
-5E2 ✓ (Seatrium), BS6 ✓ (Yangzijiang Shipbuilding), YF8 (Yangzijiang Financial)
 
 ### Transport & aviation
 C6L (SIA), S58 (SATS), S59 (SIA Engineering), C52 (ComfortDelGro)
@@ -166,7 +165,6 @@ F34 (Wilmar), C07 (Jardine Cycle & Carriage), D01 (DFI Retail),
 Y92 (Thai Beverage), G13 (Genting Singapore), OV8 (Sheng Siong)
 
 ### Manufacturing & tech
-V03 (Venture Corp), AWX (AEM Holdings)
 
 ### Healthcare
 BSL (Raffles Medical)
