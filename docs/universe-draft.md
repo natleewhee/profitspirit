@@ -12,7 +12,7 @@ individual names, and the bucket rationale is there so you can judge it.
 
 ---
 
-## Theme 1 — AI Infrastructure / Semis (~70)
+## Theme 1 — AI Infrastructure / Semis (~66)
 
 Your existing area of focus. This list is deliberately broad along the *supply
 chain* rather than deep in any one layer, so a trigger anywhere in the chain
@@ -53,7 +53,7 @@ CRWV ✓, NBIS ✓, APLD, IREN, CIFR, WULF, CORZ
 EQIX, DLR
 
 ### Electrical & thermal infrastructure
-VRT, ETN, NVT, GEV ✓,
+VRT, ETN, NVT, GEV ✓
 
 ### Power generation with datacenter exposure
 CEG, VST, TLN
@@ -62,13 +62,14 @@ CEG, VST, TLN
 BWXT, SMR, OKLO ✓
 
 > **Note on the last two buckets:** power is where AI-infra and "non-tech
-> asymmetric" genuinely overlap. I've put the datacenter-demand angle here and
-> the fuel-cycle angle in Theme 2. If that double-counting annoys you, cut the
-> nuclear bucket here and keep it in Theme 2 only.
+> asymmetric" genuinely overlap — the datacenter-demand angle sits here,
+> the uranium/fuel-cycle angle sits in Theme 2. No ticker overlap left after
+> your cuts, but worth remembering these two buckets are reading the same
+> trade from different angles.
 
 ---
 
-## Theme 2 — Non-Tech Asymmetric (~95)
+## Theme 2 — Non-Tech Asymmetric (~72)
 
 This is the bucket that needed the most deliberate construction, because
 "asymmetric" is a strategy descriptor, not a sector. I've organised it by
@@ -129,7 +130,7 @@ VALE, PBR, BAP, GGB, SID
 
 ---
 
-## Theme 3 — SGX (~40)
+## Theme 3 — SGX (~35)
 
 Closes the gap you flagged. Small enough to hand-list, which is the point —
 this is exactly the sort of coverage Finviz never gave you.
@@ -144,7 +145,7 @@ S68 (SGX)
 Z74 (Singtel), CC3 (StarHub), CJLU (NetLink NBN Trust)
 
 ### Industrial / marine / offshore
-BN4 (Keppel), U96 (Sembcorp Industries), S63 (ST Engineering),
+BN4 (Keppel), U96 (Sembcorp Industries), S63 (ST Engineering)
 
 ### Transport & aviation
 C6L (SIA), S58 (SATS), S59 (SIA Engineering), C52 (ComfortDelGro)
@@ -164,8 +165,6 @@ J69U (Frasers Centrepoint)
 F34 (Wilmar), C07 (Jardine Cycle & Carriage), D01 (DFI Retail),
 Y92 (Thai Beverage), G13 (Genting Singapore), OV8 (Sheng Siong)
 
-### Manufacturing & tech
-
 ### Healthcare
 BSL (Raffles Medical)
 
@@ -178,7 +177,8 @@ BSL (Raffles Medical)
 ## Verification
 
 ✓ = confirmed to resolve on IBKR in this session (symbol, exchange, and
-description all checked): ALAB, CRWV, NBIS, GEV, OKLO, 5E2, BS6, D05, AJBU.
+description all checked): ALAB, CRWV, NBIS, GEV, OKLO, D05, AJBU.
+(5E2 and BS6 were also confirmed but have since been cut from the list.)
 
 Everything else is **drafted from knowledge and not yet verified.** Two
 specific risks:
@@ -187,7 +187,7 @@ specific risks:
    cutoff won't be reflected. US mid-caps and the energy/shipping buckets are
    the most exposed to this — those sectors consolidate constantly.
 2. **SGX codes.** The major counters above are high-confidence, but the
-   smaller ones (CJLU, YF8, OV8, AWX, BSL, J69U, K71U) are the most likely to
+   smaller ones (CJLU, YF8, OV8, BSL, J69U, K71U) are the most likely to
    be wrong or renamed. Verify these before trusting them.
 
 **Recommended:** once you've cut this down, run the survivors through IBKR
