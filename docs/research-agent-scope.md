@@ -5,8 +5,8 @@ portfolio → risk → monitor). This is the free-tier, low-complexity version o
 the "AI trading desk" idea — same spirit (structured, multi-agent-scrutinized
 recommendations), radically smaller build.
 
-**Status:** planning document, nothing built yet. This is what gets agreed
-before any code is written.
+**Status:** Phase 0 decisions locked. See §9 for what was decided and why.
+Ready to start Phase 1.
 
 ---
 
@@ -91,17 +91,24 @@ roster (sentiment analyst, dedicated risk/portfolio manager, trader agent).
 | RSS feeds | Free | News headlines for context | No sentiment scoring, just headline text |
 | Claude (Anthropic API) | Pay-per-use, already in use | The three agents above | Cost scales with tickers × runs — see §7 |
 
-SGX names in the universe won't have EDGAR coverage — the Fundamentals
-Analyst either needs a fallback (SGX-listed companies file with SGXNet, no
-free structured API) or those tickers get technicals-only scorecards in
-phase 1. Worth deciding explicitly rather than discovering it mid-build.
+**SGX scope decision:** Phase 1 covers **US-listed tickers only**
+(AI-infra/semis + non-tech asymmetric themes, ~138 of the 173). SGX names
+have no free structured filing source (SGXNet isn't a free API), so they're
+excluded rather than shipped with a silently weaker (technicals-only)
+scorecard. Revisit once a fundamentals path for SGX exists — either a
+future paid source or a manual-notes workaround.
 
 ## 5. Scorecard schema
 
 The structured contract between the agent pipeline and the dashboard UI.
-Loosely inspired by the JPM card you shared, renamed to avoid implying
-false precision (no "$477 forward target" — that reads as a confident
-number when it's a model's estimate):
+Loosely inspired by the JPM card you shared.
+
+**Numeric targets: included, by decision.** These are the Synthesizer's
+estimates derived only from what the two analysts actually surfaced (last
+close, recent trading range, any valuation ratios yfinance returns) — not
+invented, but also not the output of a real valuation model. The
+`targetsBasis` field exists specifically so the card can show its work
+rather than presenting a number with false authority.
 
 ```
 {
@@ -114,23 +121,31 @@ number when it's a model's estimate):
   confidenceRead: "low" | "medium" | "high"   // how much the two analysts agreed
   riskFlags: string[]               // anything that should give you pause
   recommendation: "watch" | "research further" | "pass"
+
+  entryPriceEstimate: number | null       // from 3.3, grounded in 3.2's data
+  fairValueEstimate: number | null        // from 3.3, grounded in 3.1 + 3.2
+  targetsBasis: string                    // one line: what the estimate is derived from
 }
 ```
 
-Deliberately **no numeric price targets** in phase 1 — "$465 intrinsic
-value" implies a precision this system doesn't have. If you want numeric
-targets later, that's a phase 2+ decision made with eyes open about what
-backs the number.
+`null` is a valid, expected value for both target fields — if the
+analysts didn't surface enough to ground an estimate, the Synthesizer
+says so instead of guessing. The UI should render "insufficient data" for
+a null target, never a blank or a zero.
 
 ## 6. Obsidian's role
 
 A companion research notebook, not the system of record. Each ticker run
-also writes a markdown file into an Obsidian vault (just a folder — no
+would write a markdown file into an Obsidian vault (just a folder — no
 Obsidian-specific setup needed on the writing side) containing the full
-agent output in readable form, tagged by theme and ticker. You get
-backlinks and a graph view connecting companies/themes for free, with zero
-UI work. The Postgres scorecard stays the structured source of truth that
-the dashboard reads; Obsidian is where you read and think.
+agent output in readable form, tagged by theme and ticker — backlinks and
+a graph view connecting companies/themes for free, zero UI work. The
+Postgres scorecard stays the structured source of truth the dashboard
+reads; Obsidian would be where you read and think.
+
+**Vault location: deferred.** Not needed until Phase 3. Decide once
+Phases 1–2 are working and it's clear the pipeline output is worth
+building a notebook around.
 
 ## 7. Cost reality
 
@@ -145,10 +160,10 @@ size this before turning on any automation, not after.
 writing code.
 
 **Phase 1 — single ticker, manual trigger, no UI.**
-Build the three agents as a script. Run it by hand on 3–5 tickers you
-already know well. Read the output. Judge quality before building anything
-else — this is the same "test before automating" principle from the
-Finviz universe work.
+Build the three agents as a script. Run it by hand on 3–5 **US-listed**
+tickers you already know well (SGX out of scope per §4). Read the output.
+Judge quality before building anything else — this is the same "test
+before automating" principle from the Finviz universe work.
 
 **Phase 2 — Postgres + dashboard card.**
 Only if phase 1 output is good enough to trust. Add the scorecard table,
@@ -162,13 +177,18 @@ Add the markdown-vault write-out once the core pipeline is stable.
 Not committed to here. Revisit once phases 1–3 are working and you've seen
 real cost and quality over a few weeks of manual runs.
 
-## 9. Open questions for you
+## 9. Phase 0 decisions
 
-1. SGX names without EDGAR coverage — technicals-only scorecard, or skip
-   them in phase 1?
-2. Confirm the "no numeric price targets" call in §5 — some investors
-   want the number even caveated; others find it actively misleading. This
-   is your call, not mine to make silently.
-3. Where should the Obsidian vault live — a folder in this repo, or
-   somewhere outside it? Affects whether it's git-tracked alongside the
-   app.
+Resolved before Phase 1 starts:
+
+1. **SGX coverage:** excluded from Phase 1. US-listed tickers only
+   (~138 of 173). Revisit once a fundamentals source for SGX exists.
+2. **Numeric targets:** included. `entryPriceEstimate` and
+   `fairValueEstimate` are in the schema, each paired with a
+   `targetsBasis` string so the card shows what grounds the number, and
+   `null` is valid/expected when the analysts didn't surface enough to
+   estimate from.
+3. **Obsidian vault location:** deferred — not a Phase 1 blocker, decide
+   at Phase 3.
+
+Phase 0 is complete. Next: Phase 1 build.
