@@ -5,8 +5,11 @@ portfolio → risk → monitor). This is the free-tier, low-complexity version o
 the "AI trading desk" idea — same spirit (structured, multi-agent-scrutinized
 recommendations), radically smaller build.
 
-**Status:** Phase 0 decisions locked. See §9 for what was decided and why.
-Ready to start Phase 1.
+**Status:** Phase 1 built. Script lives at `scripts/research-agent/` — run with
+`npm run research -- TICKER [TICKER ...]`. See README's "Research agent" section
+for usage. Not yet run against real tickers from this environment (SEC EDGAR is
+unreachable from this sandbox's network policy) — run it from a machine with a
+normal internet connection and judge output quality before starting Phase 2.
 
 ---
 

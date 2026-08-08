@@ -80,3 +80,20 @@ commit) for it to take effect.
 4. Once you've researched a name elsewhere (Claude chat, etc.), flip its
    status to "Researched" (or further along) directly from the table —
    no separate edit screen needed for status changes.
+
+## Research agent — Phase 1 (manual, no UI)
+
+See `docs/research-agent-scope.md` for the full scope. Phase 1 is a
+standalone script — no database writes, no dashboard integration — that runs
+three Claude agents (Fundamentals, Technicals, Synthesizer) against a US-listed
+ticker and prints/saves a scorecard.
+
+1. Set an API key: `export ANTHROPIC_API_KEY=...` (or `ant auth login`).
+2. Run it: `npm run research -- NVDA AMD CCJ` (space-separated tickers, US-listed only per the SGX Phase 1 exclusion).
+3. Each ticker's scorecard prints to the console and saves to
+   `docs/research-runs/<ticker>-<date>.json` (gitignored — local review only).
+
+Data sources: SEC EDGAR (free, no key) for fundamentals, Yahoo Finance via
+`yahoo-finance2` (free, unofficial — can break silently) for price/volume.
+Judge output quality on a handful of tickers before building anything further
+(Phase 2 is Postgres + a dashboard card — not started).
