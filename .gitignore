@@ -41,3 +41,6 @@ next-env.d.ts
 /.claude/
 /.windsurf/
 skills-lock.json
+
+# research agent Phase 1 output (local test runs, not seed data)
+/docs/research-runs/

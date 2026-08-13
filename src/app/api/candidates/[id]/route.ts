@@ -6,7 +6,10 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const candidate = await prisma.candidate.findUnique({ where: { id } });
+  const candidate = await prisma.candidate.findUnique({
+    where: { id },
+    include: { scorecards: { orderBy: { createdAt: "desc" } } },
+  });
 
   if (!candidate) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });

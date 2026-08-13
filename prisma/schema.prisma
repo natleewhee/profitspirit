@@ -22,14 +22,49 @@ enum Status {
   PASSED
 }
 
+enum ConfidenceRead {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum Recommendation {
+  WATCH
+  RESEARCH_FURTHER
+  PASS
+}
+
 model Candidate {
-  id            String   @id @default(cuid())
+  id            String      @id @default(cuid())
   ticker        String
   dateScanned   DateTime
   theme         Theme
   triggerReason String
-  status        Status   @default(NEW)
+  status        Status      @default(NEW)
   notes         String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  scorecards    Scorecard[]
+}
+
+// Phase 2 — one row per research-agent run (docs/research-agent-scope.md §5).
+// A candidate can be re-researched over time, so this is a history, not a 1:1.
+model Scorecard {
+  id                  String         @id @default(cuid())
+  candidateId         String
+  candidate           Candidate      @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  asOf                DateTime
+  fundamentalsSummary String
+  technicalsSummary   String
+  bullCase            String
+  bearCase            String
+  confidenceRead      ConfidenceRead
+  riskFlags           String[]
+  recommendation      Recommendation
+  entryPriceEstimate  Float?
+  fairValueEstimate   Float?
+  targetsBasis        String
+  createdAt           DateTime       @default(now())
+
+  @@index([candidateId])
 }
