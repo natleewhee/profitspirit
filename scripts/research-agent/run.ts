@@ -1,12 +1,13 @@
 // Phase 1 — manual, single-run research pipeline. No UI, no DB, no scheduling.
 // Usage: npx tsx scripts/research-agent/run.ts NVDA AMD CCJ
 //
-// For each ticker: fetch EDGAR + market data, run the three agents, print the
-// scorecard, and save it to docs/research-runs/<ticker>-<date>.json for review.
+// For each ticker: fetch fundamentals + market data (both from Yahoo
+// Finance), run the three agents, print the scorecard, and save it to
+// docs/research-runs/<ticker>-<date>.json for review.
 
 import fs from "fs";
 import path from "path";
-import { fetchEdgarBundle } from "../../src/lib/research/edgar";
+import { fetchFundamentalsData } from "../../src/lib/research/fundamentalsData";
 import { fetchMarketData } from "../../src/lib/research/marketData";
 import {
   runFundamentalsAnalyst,
@@ -19,16 +20,16 @@ const OUTPUT_DIR = path.join(process.cwd(), "docs", "research-runs");
 async function runOne(ticker: string, triggerReason: string) {
   console.log(`\n=== ${ticker} ===`);
 
-  console.log("Fetching EDGAR filings...");
-  const edgar = await fetchEdgarBundle(ticker);
-  if (!edgar.found) console.log(`  (no EDGAR match: ${edgar.reason})`);
+  console.log("Fetching fundamentals data...");
+  const fundamentals = await fetchFundamentalsData(ticker);
+  if (!fundamentals.found) console.log(`  (no fundamentals data: ${fundamentals.reason})`);
 
   console.log("Fetching market data...");
   const market = await fetchMarketData(ticker);
   if (!market.found) console.log(`  (no market data: ${market.reason})`);
 
   console.log("Running Fundamentals Analyst...");
-  const fundamentalsSummary = await runFundamentalsAnalyst(edgar);
+  const fundamentalsSummary = await runFundamentalsAnalyst(fundamentals);
 
   console.log("Running Technicals Analyst...");
   const technicalsSummary = await runTechnicalsAnalyst(market);

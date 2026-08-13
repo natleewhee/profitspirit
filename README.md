@@ -85,10 +85,20 @@ commit) for it to take effect.
 
 See `docs/research-agent-scope.md` for the full scope, phases, and
 boundaries. The pipeline itself (`src/lib/research/`) is three LLM agents —
-Fundamentals (SEC EDGAR), Technicals (Yahoo Finance via `yahoo-finance2`),
-and a Synthesizer that produces the scorecard — shared between two entry
-points. Model calls run on **Groq's free tier** (no cost) rather than a paid
-API, using `llama-3.3-70b-versatile`.
+Fundamentals and Technicals both read Yahoo Finance (via `yahoo-finance2`),
+and a Synthesizer produces the scorecard — shared between two entry points.
+Model calls run on **Groq's free tier** (no cost) rather than a paid API,
+using `llama-3.3-70b-versatile`.
+
+**Why Yahoo Finance for both, not SEC EDGAR:** the original plan used SEC
+EDGAR for fundamentals (official source, no key), but EDGAR returned 403s
+when called from Vercel's servers in production — likely SEC blocking
+datacenter/cloud IP ranges, not just a header issue. Fundamentals now read
+Yahoo Finance's `quoteSummary` (key ratios + income statement history)
+instead — same free, unofficial, no-key source already used for technicals,
+consolidated onto one dependency. Tradeoff: no more "official primary
+source" for fundamentals, and a single point of failure if Yahoo changes
+its unofficial API.
 
 **CLI (Phase 1) — no database, prints and saves to a local file:**
 
@@ -111,9 +121,8 @@ Scorecards print to the console and save to
    same page (a candidate can be re-researched over time; each run adds a
    new scorecard rather than overwriting the last one).
 
-Data sources: SEC EDGAR (free, no key, US-listed filers only — SGX names are
-out of scope per the scope doc) and Yahoo Finance (free, unofficial — can
-break without notice).
+Data source: Yahoo Finance (free, unofficial, no key — can break without
+notice) for both fundamentals and technicals.
 
 **Vercel timeout note:** the research route runs three sequential model
 calls plus two data fetches, which can take 15–30+ seconds. It's set to

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { fetchEdgarBundle } from "@/lib/research/edgar";
+import { fetchFundamentalsData } from "@/lib/research/fundamentalsData";
 import { fetchMarketData } from "@/lib/research/marketData";
 import {
   runFundamentalsAnalyst,
@@ -9,7 +9,7 @@ import {
 } from "@/lib/research/agents";
 import type { Scorecard as AgentScorecard } from "@/lib/research/scorecard";
 
-// Three sequential Claude calls plus two data fetches can take well past
+// Three sequential model calls plus two data fetches can take well past
 // Vercel's default 10s function timeout — give this route real headroom.
 export const maxDuration = 60;
 
@@ -39,13 +39,13 @@ export async function POST(
     return NextResponse.json({ error: "Candidate not found" }, { status: 404 });
   }
 
-  const [edgar, market] = await Promise.all([
-    fetchEdgarBundle(candidate.ticker),
+  const [fundamentals, market] = await Promise.all([
+    fetchFundamentalsData(candidate.ticker),
     fetchMarketData(candidate.ticker),
   ]);
 
   const [fundamentalsSummary, technicalsSummary] = await Promise.all([
-    runFundamentalsAnalyst(edgar),
+    runFundamentalsAnalyst(fundamentals),
     runTechnicalsAnalyst(market),
   ]);
 
