@@ -1,5 +1,5 @@
 import Groq from "groq-sdk";
-import type { EdgarBundle } from "./edgar";
+import type { FundamentalsBundle } from "./fundamentalsData";
 import type { MarketDataBundle } from "./marketData";
 import { ScorecardSchema, type Scorecard } from "./scorecard";
 
@@ -65,24 +65,26 @@ async function chat(system: string, user: string, maxTokens: number): Promise<st
   return completion.choices[0]?.message?.content ?? "";
 }
 
-// 3.1 Fundamentals Analyst — reads SEC EDGAR only. No price predictions, no
-// recommendations, no reading anything outside the filings data it's given.
-export async function runFundamentalsAnalyst(edgar: EdgarBundle): Promise<string> {
-  if (!edgar.found) {
-    return `No EDGAR data available for ${edgar.ticker}: ${edgar.reason}`;
+// 3.1 Fundamentals Analyst — reads Yahoo Finance's fundamentals data only
+// (quoteSummary: key ratios + income statement history). No price
+// predictions, no recommendations, no reading anything beyond what's given.
+export async function runFundamentalsAnalyst(fundamentals: FundamentalsBundle): Promise<string> {
+  if (!fundamentals.found) {
+    return `No fundamentals data available for ${fundamentals.ticker}: ${fundamentals.reason}`;
   }
 
   return chat(
-    "You are a fundamentals analyst. You read only the SEC EDGAR filing data " +
-      "you're given — recent filing metadata and a handful of XBRL financial facts. " +
-      "Produce a plain-language summary of financial health: revenue trend, margin " +
-      "trend, debt position, and anything materially unusual in the latest filings " +
-      "(restatements, going-concern language, guidance cuts — note you only have " +
-      "filing metadata, not full text, so infer unusual activity only from what's " +
-      "actually in the data, never invent it). Do not predict price. Do not " +
-      "recommend buy/sell/hold. Do not reference information beyond what's provided. " +
-      "If the provided facts are too sparse to assess something, say so plainly.",
-    `Company: ${edgar.companyName} (${edgar.ticker}), CIK ${edgar.cik}\n\nRecent 10-K/10-Q/8-K filings:\n${JSON.stringify(edgar.recentFilings, null, 2)}\n\nKey XBRL facts (most recent 4 periods per tag, in reporting currency):\n${JSON.stringify(edgar.facts, null, 2)}`,
+    "You are a fundamentals analyst. You read only the Yahoo Finance data " +
+      "you're given — key financial ratios and a few periods of income " +
+      "statement history. Produce a plain-language summary of financial " +
+      "health: revenue trend, margin trend, debt position, and anything " +
+      "materially unusual you can infer from the numbers alone (note you " +
+      "only have summary figures, not filing text, so don't claim to know " +
+      "about restatements or guidance cuts unless the numbers themselves " +
+      "show something unusual). Do not predict price. Do not recommend " +
+      "buy/sell/hold. Do not reference information beyond what's provided. " +
+      "If the provided data is too sparse to assess something, say so plainly.",
+    `Company: ${fundamentals.companyName ?? fundamentals.ticker} (${fundamentals.ticker})\nSector: ${fundamentals.sector ?? "unknown"} / ${fundamentals.industry ?? "unknown"}\n\nKey ratios:\n${JSON.stringify(fundamentals.keyRatios, null, 2)}\n\nAnnual income statement history (most recent first):\n${JSON.stringify(fundamentals.annualIncomeStatements, null, 2)}\n\nQuarterly income statement history (most recent first):\n${JSON.stringify(fundamentals.quarterlyIncomeStatements, null, 2)}`,
     1500
   );
 }

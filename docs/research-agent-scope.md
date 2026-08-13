@@ -54,13 +54,19 @@ Each agent has one job, one data source, and a boundary on what it does
 scorecard or the research notebook.
 
 ### 3.1 Fundamentals Analyst
-- **Reads:** SEC EDGAR filings (10-K, 10-Q, 8-K) for the ticker — free,
-  no API key, official source.
+- **Reads:** Yahoo Finance's `quoteSummary` data (key financial ratios +
+  income statement history) via `yahoo-finance2` — free, no API key.
+  Originally SEC EDGAR (official source), but EDGAR returned 403s when
+  called from Vercel's servers in production — moved to Yahoo Finance to
+  match the Technicals Analyst's already-working source rather than debug
+  a likely cloud-IP block on SEC's side.
 - **Produces:** a plain-language summary of financial health, revenue
-  trend, margin trend, debt position, and anything materially unusual in
-  the latest filing (restatements, going-concern language, guidance cuts).
-- **Does not:** predict price, recommend buy/sell, or read anything other
-  than the filings themselves.
+  trend, margin trend, debt position, and anything materially unusual it
+  can infer from the numbers alone (no filing text to read, so it doesn't
+  claim to know about restatements/guidance language — only what the
+  ratios and income-statement history themselves show).
+- **Does not:** predict price, recommend buy/sell, or read anything beyond
+  the data it's given.
 
 ### 3.2 Technicals & Market-Data Analyst
 - **Reads:** price/volume history and basic fundamentals via yfinance
@@ -93,17 +99,18 @@ roster (sentiment analyst, dedicated risk/portfolio manager, trader agent).
 
 | Source | Cost | What it gives | Caveat |
 |---|---|---|---|
-| SEC EDGAR | Free, no key | Official filings | US-listed companies only — no SGX filings here |
-| yfinance | Free, no key | Price/volume, basic fundamentals | Unofficial scrape; can silently break |
+| Yahoo Finance (`yahoo-finance2`) | Free, no key | Price/volume, fundamentals (ratios + income statement history) | Unofficial scrape; can silently break. Single point of failure — both analysts now read this one source. SEC EDGAR was tried first but blocked (403) from Vercel's servers |
 | RSS feeds | Free | News headlines for context | No sentiment scoring, just headline text |
 | Groq API (Llama 3.3 70B) | Free tier, no payment | The three agents above | Rate-limited, not unlimited; open-weight model — lower ceiling than Claude on nuanced synthesis, worth watching for quality. Switched from the originally-planned Claude/Anthropic API to avoid needing a paid key — see §7 |
 
 **SGX scope decision:** Phase 1 covers **US-listed tickers only**
-(AI-infra/semis + non-tech asymmetric themes, ~138 of the 173). SGX names
-have no free structured filing source (SGXNet isn't a free API), so they're
-excluded rather than shipped with a silently weaker (technicals-only)
-scorecard. Revisit once a fundamentals path for SGX exists — either a
-future paid source or a manual-notes workaround.
+(AI-infra/semis + non-tech asymmetric themes, ~138 of the 173). Decided when
+the fundamentals source was still SEC EDGAR (US filings only, no SGX
+coverage). **Worth revisiting now that fundamentals moved to Yahoo
+Finance** — Yahoo does carry data for some SGX-listed names (`.SI` suffix
+tickers), so the original reason for the exclusion may no longer fully
+apply. Not changed here since it was an explicit Phase 0 decision; flagging
+for a deliberate re-check rather than reopening it unilaterally.
 
 ## 5. Scorecard schema
 
