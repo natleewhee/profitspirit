@@ -84,15 +84,16 @@ commit) for it to take effect.
 ## Research agent
 
 See `docs/research-agent-scope.md` for the full scope, phases, and
-boundaries. The pipeline itself (`src/lib/research/`) is three Claude agents
-— Fundamentals (SEC EDGAR), Technicals (Yahoo Finance via `yahoo-finance2`),
+boundaries. The pipeline itself (`src/lib/research/`) is three LLM agents —
+Fundamentals (SEC EDGAR), Technicals (Yahoo Finance via `yahoo-finance2`),
 and a Synthesizer that produces the scorecard — shared between two entry
-points:
+points. Model calls run on **Groq's free tier** (no cost) rather than a paid
+API, using `llama-3.3-70b-versatile`.
 
 **CLI (Phase 1) — no database, prints and saves to a local file:**
 
 ```
-export ANTHROPIC_API_KEY=...
+export GROQ_API_KEY=...   # free key: console.groq.com
 npm run research -- NVDA AMD CCJ
 ```
 
@@ -101,9 +102,10 @@ Scorecards print to the console and save to
 
 **Dashboard (Phase 2) — writes to Postgres, shown on the candidate page:**
 
-1. Open a candidate from the dashboard table (**Research** link) — this goes
+1. Set `GROQ_API_KEY` in Vercel's environment variables (Production).
+2. Open a candidate from the dashboard table (**Research** link) — this goes
    to `/candidates/[id]`.
-2. Click **Run Research**. This calls `POST /api/candidates/[id]/research`,
+3. Click **Run Research**. This calls `POST /api/candidates/[id]/research`,
    which runs the same three agents server-side and saves the result as a
    `Scorecard` row linked to that candidate. Past runs stay visible on the
    same page (a candidate can be re-researched over time; each run adds a
@@ -113,8 +115,12 @@ Data sources: SEC EDGAR (free, no key, US-listed filers only — SGX names are
 out of scope per the scope doc) and Yahoo Finance (free, unofficial — can
 break without notice).
 
-**Vercel timeout note:** the research route runs three sequential Claude
-calls plus two data fetches, which can take 20–40+ seconds. It's set to
+**Vercel timeout note:** the research route runs three sequential model
+calls plus two data fetches, which can take 15–30+ seconds. It's set to
 `maxDuration = 60` (App Router route config), but Vercel's Hobby tier has
 capped function duration in the past — if the button times out in
 production, the CLI path above still works as a fallback.
+
+**Groq free-tier note:** rate limits are generous for manual, one-ticker-at-a-time
+use but not unlimited — if you hit a rate-limit error running several
+tickers back to back, wait a minute and retry.

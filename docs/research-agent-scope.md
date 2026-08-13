@@ -96,7 +96,7 @@ roster (sentiment analyst, dedicated risk/portfolio manager, trader agent).
 | SEC EDGAR | Free, no key | Official filings | US-listed companies only — no SGX filings here |
 | yfinance | Free, no key | Price/volume, basic fundamentals | Unofficial scrape; can silently break |
 | RSS feeds | Free | News headlines for context | No sentiment scoring, just headline text |
-| Claude (Anthropic API) | Pay-per-use, already in use | The three agents above | Cost scales with tickers × runs — see §7 |
+| Groq API (Llama 3.3 70B) | Free tier, no payment | The three agents above | Rate-limited, not unlimited; open-weight model — lower ceiling than Claude on nuanced synthesis, worth watching for quality. Switched from the originally-planned Claude/Anthropic API to avoid needing a paid key — see §7 |
 
 **SGX scope decision:** Phase 1 covers **US-listed tickers only**
 (AI-infra/semis + non-tech asymmetric themes, ~138 of the 173). SGX names
@@ -156,10 +156,14 @@ building a notebook around.
 
 ## 7. Cost reality
 
-Three agent calls per ticker run (fundamentals, technicals, synthesis).
-Run manually on a handful of tickers, cost is negligible. Run automatically
-across the full 173-ticker universe weekly, cost is real and recurring —
-size this before turning on any automation, not after.
+Three agent calls per ticker run (fundamentals, technicals, synthesis), on
+Groq's free tier — no per-token cost, no billing to size. The tradeoff moved
+from money to two other things: **rate limits** (fine for manual, one-ticker
+runs; running the full 173-ticker universe back-to-back would need throttling
+or a paid Groq tier) and **quality** (an open-weight model via a free API is
+a lower ceiling than Claude, particularly on the Synthesizer's judgment calls
+— worth watching for during the Phase 1/2 quality checkpoint, and worth
+reconsidering if scorecards read shallow).
 
 ## 8. Phases
 
