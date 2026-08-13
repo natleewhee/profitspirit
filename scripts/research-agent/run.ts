@@ -57,10 +57,10 @@ async function main() {
     console.error('Example: npx tsx scripts/research-agent/run.ts NVDA AMD CCJ');
     process.exit(1);
   }
-  if (!process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_AUTH_TOKEN) {
+  if (!process.env.GROQ_API_KEY) {
     console.error(
-      "No ANTHROPIC_API_KEY (or ANTHROPIC_AUTH_TOKEN) set in the environment. " +
-        "Set it before running — see README for where to get one."
+      "No GROQ_API_KEY set in the environment. Get a free key at " +
+        "console.groq.com and set it before running — see README."
     );
     process.exit(1);
   }
