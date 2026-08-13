@@ -6,9 +6,13 @@
 
 import fs from "fs";
 import path from "path";
-import { fetchEdgarBundle } from "./edgar";
-import { fetchMarketData } from "./marketData";
-import { runFundamentalsAnalyst, runTechnicalsAnalyst, runSynthesizer } from "./agents";
+import { fetchEdgarBundle } from "../../src/lib/research/edgar";
+import { fetchMarketData } from "../../src/lib/research/marketData";
+import {
+  runFundamentalsAnalyst,
+  runTechnicalsAnalyst,
+  runSynthesizer,
+} from "../../src/lib/research/agents";
 
 const OUTPUT_DIR = path.join(process.cwd(), "docs", "research-runs");
 

@@ -81,19 +81,40 @@ commit) for it to take effect.
    status to "Researched" (or further along) directly from the table —
    no separate edit screen needed for status changes.
 
-## Research agent — Phase 1 (manual, no UI)
+## Research agent
 
-See `docs/research-agent-scope.md` for the full scope. Phase 1 is a
-standalone script — no database writes, no dashboard integration — that runs
-three Claude agents (Fundamentals, Technicals, Synthesizer) against a US-listed
-ticker and prints/saves a scorecard.
+See `docs/research-agent-scope.md` for the full scope, phases, and
+boundaries. The pipeline itself (`src/lib/research/`) is three Claude agents
+— Fundamentals (SEC EDGAR), Technicals (Yahoo Finance via `yahoo-finance2`),
+and a Synthesizer that produces the scorecard — shared between two entry
+points:
 
-1. Set an API key: `export ANTHROPIC_API_KEY=...` (or `ant auth login`).
-2. Run it: `npm run research -- NVDA AMD CCJ` (space-separated tickers, US-listed only per the SGX Phase 1 exclusion).
-3. Each ticker's scorecard prints to the console and saves to
-   `docs/research-runs/<ticker>-<date>.json` (gitignored — local review only).
+**CLI (Phase 1) — no database, prints and saves to a local file:**
 
-Data sources: SEC EDGAR (free, no key) for fundamentals, Yahoo Finance via
-`yahoo-finance2` (free, unofficial — can break silently) for price/volume.
-Judge output quality on a handful of tickers before building anything further
-(Phase 2 is Postgres + a dashboard card — not started).
+```
+export ANTHROPIC_API_KEY=...
+npm run research -- NVDA AMD CCJ
+```
+
+Scorecards print to the console and save to
+`docs/research-runs/<ticker>-<date>.json` (gitignored — local review only).
+
+**Dashboard (Phase 2) — writes to Postgres, shown on the candidate page:**
+
+1. Open a candidate from the dashboard table (**Research** link) — this goes
+   to `/candidates/[id]`.
+2. Click **Run Research**. This calls `POST /api/candidates/[id]/research`,
+   which runs the same three agents server-side and saves the result as a
+   `Scorecard` row linked to that candidate. Past runs stay visible on the
+   same page (a candidate can be re-researched over time; each run adds a
+   new scorecard rather than overwriting the last one).
+
+Data sources: SEC EDGAR (free, no key, US-listed filers only — SGX names are
+out of scope per the scope doc) and Yahoo Finance (free, unofficial — can
+break without notice).
+
+**Vercel timeout note:** the research route runs three sequential Claude
+calls plus two data fetches, which can take 20–40+ seconds. It's set to
+`maxDuration = 60` (App Router route config), but Vercel's Hobby tier has
+capped function duration in the past — if the button times out in
+production, the CLI path above still works as a fallback.

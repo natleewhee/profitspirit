@@ -5,11 +5,15 @@ portfolio → risk → monitor). This is the free-tier, low-complexity version o
 the "AI trading desk" idea — same spirit (structured, multi-agent-scrutinized
 recommendations), radically smaller build.
 
-**Status:** Phase 1 built. Script lives at `scripts/research-agent/` — run with
-`npm run research -- TICKER [TICKER ...]`. See README's "Research agent" section
-for usage. Not yet run against real tickers from this environment (SEC EDGAR is
-unreachable from this sandbox's network policy) — run it from a machine with a
-normal internet connection and judge output quality before starting Phase 2.
+**Status:** Phases 1 and 2 built. The three-agent pipeline lives at
+`src/lib/research/` and is shared by the CLI script
+(`scripts/research-agent/run.ts`, Phase 1) and the dashboard's
+`POST /api/candidates/[id]/research` route + candidate detail page (Phase 2).
+See README's "Research agent" section for how to run either. **Not yet run
+against real tickers** — this was built and merged ahead of the "judge Phase 1
+output before building Phase 2" checkpoint the phasing below calls for,
+at explicit user request. Worth actually running it and checking quality
+now that both are live, since Phase 3/4 decisions still depend on that.
 
 ---
 
@@ -168,10 +172,10 @@ tickers you already know well (SGX out of scope per §4). Read the output.
 Judge quality before building anything else — this is the same "test
 before automating" principle from the Finviz universe work.
 
-**Phase 2 — Postgres + dashboard card.**
-Only if phase 1 output is good enough to trust. Add the scorecard table,
-wire the three agents into a route the dashboard can call, build the card
-UI.
+**Phase 2 — Postgres + dashboard card. Built** (`Scorecard` table, the
+`/api/candidates/[id]/research` route, and a card UI on the candidate detail
+page) — ahead of confirming Phase 1 output quality, at explicit user request.
+Judge quality now that it's live before treating Phase 3/4 as green-lit.
 
 **Phase 3 — Obsidian export.**
 Add the markdown-vault write-out once the core pipeline is stable.

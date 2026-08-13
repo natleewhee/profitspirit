@@ -17,21 +17,41 @@ const FUNDAMENTAL_TAGS = [
 
 type TickerMapEntry = { cik_str: number; ticker: string; title: string };
 
+type SubmissionsResponse = {
+  name?: string;
+  filings?: {
+    recent?: {
+      form?: string[];
+      filingDate?: string[];
+      primaryDocDescription?: (string | null)[];
+    };
+  };
+};
+
+type XbrlFactValue = { form: string; end: string; val: number };
+type CompanyFactsResponse = {
+  facts?: {
+    "us-gaap"?: Record<string, { units?: Record<string, XbrlFactValue[]> }>;
+  };
+};
+
 let tickerMapCache: Record<string, TickerMapEntry> | null = null;
 
-async function fetchJson(url: string): Promise<any> {
+async function fetchJson<T>(url: string): Promise<T> {
   const res = await fetch(url, { headers: { "User-Agent": USER_AGENT } });
   if (!res.ok) {
     throw new Error(`EDGAR request failed (${res.status}): ${url}`);
   }
-  return res.json();
+  return res.json() as Promise<T>;
 }
 
 async function getTickerMap(): Promise<Record<string, TickerMapEntry>> {
   if (tickerMapCache) return tickerMapCache;
-  const raw = await fetchJson("https://www.sec.gov/files/company_tickers.json");
+  const raw = await fetchJson<Record<string, TickerMapEntry>>(
+    "https://www.sec.gov/files/company_tickers.json"
+  );
   const byTicker: Record<string, TickerMapEntry> = {};
-  for (const entry of Object.values(raw) as TickerMapEntry[]) {
+  for (const entry of Object.values(raw)) {
     byTicker[entry.ticker.toUpperCase()] = entry;
   }
   tickerMapCache = byTicker;
@@ -63,7 +83,9 @@ export async function fetchEdgarBundle(ticker: string): Promise<EdgarBundle> {
   }
   const cik = paddedCik(entry.cik_str);
 
-  const submissions = await fetchJson(`https://data.sec.gov/submissions/CIK${cik}.json`);
+  const submissions = await fetchJson<SubmissionsResponse>(
+    `https://data.sec.gov/submissions/CIK${cik}.json`
+  );
   const recentForms: string[] = submissions.filings?.recent?.form ?? [];
   const recentDates: string[] = submissions.filings?.recent?.filingDate ?? [];
   const recentDocDesc: (string | null)[] = submissions.filings?.recent?.primaryDocDescription ?? [];
@@ -75,7 +97,9 @@ export async function fetchEdgarBundle(ticker: string): Promise<EdgarBundle> {
 
   const factsOut: Record<string, { unit: string; end: string; val: number; form: string }[]> = {};
   try {
-    const companyFacts = await fetchJson(`https://data.sec.gov/api/xbrl/companyfacts/CIK${cik}.json`);
+    const companyFacts = await fetchJson<CompanyFactsResponse>(
+      `https://data.sec.gov/api/xbrl/companyfacts/CIK${cik}.json`
+    );
     const usGaap = companyFacts.facts?.["us-gaap"] ?? {};
     for (const tag of FUNDAMENTAL_TAGS) {
       const tagData = usGaap[tag];
@@ -83,7 +107,7 @@ export async function fetchEdgarBundle(ticker: string): Promise<EdgarBundle> {
       const units = tagData.units ?? {};
       const unitKey = Object.keys(units)[0];
       if (!unitKey) continue;
-      const values = (units[unitKey] as any[])
+      const values = units[unitKey]
         .filter((v) => v.form === "10-K" || v.form === "10-Q")
         .sort((a, b) => (a.end < b.end ? 1 : -1))
         .slice(0, 4)

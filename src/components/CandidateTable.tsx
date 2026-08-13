@@ -109,9 +109,12 @@ export function CandidateTable({ candidates, latestDate, onStatusChange, onDelet
                   {c.notes}
                 </td>
                 <td className="whitespace-nowrap px-4 py-2 text-right">
+                  <Link href={`/candidates/${c.id}`} className="text-blue-600 hover:underline">
+                    Research
+                  </Link>
                   <Link
                     href={`/candidates/${c.id}/edit`}
-                    className="text-blue-600 hover:underline"
+                    className="ml-3 text-blue-600 hover:underline"
                   >
                     Edit
                   </Link>
