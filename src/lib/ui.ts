@@ -124,3 +124,17 @@ export const STALENESS_TEXT_STYLES: Record<ReturnType<typeof stalenessLevel>, st
   aging: "text-amber-700",
   stale: "text-red-700",
 };
+
+// Past 30 days, the valuation cell (verdict + gap) is dimmed and gets a
+// tooltip clarifying the gap is against a frozen research-date price, not a
+// live quote — the "honesty fix" from the UX review's staleness item.
+export const VALUATION_CELL_OPACITY: Record<ReturnType<typeof stalenessLevel>, string> = {
+  fresh: "opacity-100",
+  aging: "opacity-60",
+  stale: "opacity-60",
+};
+
+export function formatAsOfTooltip(researchedAtIso: string): string | undefined {
+  if (stalenessLevel(researchedAtIso) === "fresh") return undefined;
+  return `vs price on ${formatDate(researchedAtIso)}; not a live quote`;
+}

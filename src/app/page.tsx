@@ -1,34 +1,97 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CandidateWithLatest } from "@/lib/types";
-import { Status } from "@prisma/client";
+import { Status, ValuationVerdict } from "@prisma/client";
 import { CandidateTable } from "@/components/CandidateTable";
-import { FilterBar } from "@/components/FilterBar";
-import { STATUS_OPTIONS, STATUS_LABELS } from "@/lib/labels";
+import { FilterBar, DEFAULT_FILTERS, Filters } from "@/components/FilterBar";
+import { WATCH_THRESHOLD } from "@/lib/research/score";
+import { stalenessLevel } from "@/lib/ui";
 
-export default function DashboardPage() {
+const PASSIVE_STATUSES: Status[] = ["PASSED", "ADDED_TO_PORTFOLIO"];
+
+function filtersFromParams(params: URLSearchParams): Filters {
+  return {
+    q: params.get("q") ?? DEFAULT_FILTERS.q,
+    theme: params.get("theme") ?? DEFAULT_FILTERS.theme,
+    status: params.get("status") ?? DEFAULT_FILTERS.status,
+    verdict: params.get("verdict") ?? DEFAULT_FILTERS.verdict,
+    research: (params.get("research") as Filters["research"]) ?? DEFAULT_FILTERS.research,
+    minScore: Number(params.get("minScore") ?? DEFAULT_FILTERS.minScore),
+  };
+}
+
+function paramsFromFilters(filters: Filters, extra: Record<string, string | null>): string {
+  const params = new URLSearchParams();
+  if (filters.q) params.set("q", filters.q);
+  if (filters.theme !== "ALL") params.set("theme", filters.theme);
+  if (filters.status !== "ALL") params.set("status", filters.status);
+  if (filters.verdict !== "ALL") params.set("verdict", filters.verdict);
+  if (filters.research !== "ALL") params.set("research", filters.research);
+  if (filters.minScore > 0) params.set("minScore", String(filters.minScore));
+  for (const [key, value] of Object.entries(extra)) {
+    if (value) params.set(key, value);
+  }
+  return params.toString();
+}
+
+function DashboardContent() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const filters = useMemo(() => filtersFromParams(searchParams), [searchParams]);
+  const onlyLatestScan = searchParams.get("scan") === "latest";
+  const actionableOnly = searchParams.get("quick") === "actionable";
+
   const [candidates, setCandidates] = useState<CandidateWithLatest[]>([]);
   const [loading, setLoading] = useState(true);
-  const [theme, setTheme] = useState("ALL");
-  const [status, setStatus] = useState("ALL");
   const [runningIds, setRunningIds] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     setLoading(true);
-    const params = new URLSearchParams();
-    if (theme !== "ALL") params.set("theme", theme);
-    if (status !== "ALL") params.set("status", status);
-    const res = await fetch(`/api/candidates?${params.toString()}`);
+    const res = await fetch("/api/candidates");
     const data = await res.json();
     setCandidates(data);
     setLoading(false);
-  }, [theme, status]);
+  }, []);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  function updateUrl(patch: Partial<Filters>, extra: Record<string, string | null> = {}) {
+    const nextFilters = { ...filters, ...patch };
+    const currentExtra = {
+      scan: onlyLatestScan ? "latest" : null,
+      quick: actionableOnly ? "actionable" : null,
+      ...extra,
+    };
+    const qs = paramsFromFilters(nextFilters, currentExtra);
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }
+
+  function resetFilters() {
+    router.replace(pathname, { scroll: false });
+  }
+
+  function toggleTile(next: Record<string, string | null>) {
+    // Clicking an already-active tile clears back to no filters at all;
+    // otherwise it replaces the whole filter set with just this tile's slice.
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(next)) {
+      if (value) params.set(key, value);
+    }
+    const nextQs = params.toString();
+    const currentQs = searchParams.toString();
+    if (nextQs === currentQs) {
+      router.replace(pathname, { scroll: false });
+    } else {
+      router.replace(nextQs ? `${pathname}?${nextQs}` : pathname, { scroll: false });
+    }
+  }
 
   const latestDate = useMemo(() => {
     if (candidates.length === 0) return null;
@@ -38,17 +101,71 @@ export default function DashboardPage() {
     );
   }, [candidates]);
 
-  const statusCounts = useMemo(() => {
-    const counts: Record<Status, number> = {
-      NEW: 0,
-      RESEARCHED: 0,
-      ADDED_TO_WATCHLIST: 0,
-      ADDED_TO_PORTFOLIO: 0,
-      PASSED: 0,
-    };
-    for (const c of candidates) counts[c.status]++;
-    return counts;
-  }, [candidates]);
+  const needsResearchCount = useMemo(
+    () => candidates.filter((c) => c.scorecardCount === 0).length,
+    [candidates]
+  );
+  const staleCount = useMemo(
+    () =>
+      candidates.filter(
+        (c) => c.scorecards[0] && stalenessLevel(c.scorecards[0].createdAt) === "stale"
+      ).length,
+    [candidates]
+  );
+  const actionableCount = useMemo(
+    () =>
+      candidates.filter((c) => {
+        const latest = c.scorecards[0];
+        if (!latest) return false;
+        if (PASSIVE_STATUSES.includes(c.status)) return false;
+        return (
+          (latest.recommendationScore ?? 0) >= WATCH_THRESHOLD &&
+          latest.valuationVerdict === "UNDERVALUED"
+        );
+      }).length,
+    [candidates]
+  );
+  const lastScanCount = useMemo(
+    () => (latestDate ? candidates.filter((c) => c.dateScanned === latestDate).length : 0),
+    [candidates, latestDate]
+  );
+
+  const filtered = useMemo(() => {
+    return candidates.filter((c) => {
+      const latest = c.scorecards[0];
+
+      if (onlyLatestScan && latestDate && c.dateScanned !== latestDate) return false;
+      if (actionableOnly) {
+        if (!latest) return false;
+        if (PASSIVE_STATUSES.includes(c.status)) return false;
+        if ((latest.recommendationScore ?? 0) < WATCH_THRESHOLD) return false;
+        if (latest.valuationVerdict !== "UNDERVALUED") return false;
+      }
+
+      if (filters.q && !c.ticker.toUpperCase().includes(filters.q.toUpperCase())) return false;
+      if (filters.theme !== "ALL" && c.theme !== filters.theme) return false;
+      if (filters.status !== "ALL" && c.status !== filters.status) return false;
+
+      if (filters.research === "NEEDS" && c.scorecardCount > 0) return false;
+      if (filters.research === "RESEARCHED" && c.scorecardCount === 0) return false;
+      if (filters.research === "STALE" && (!latest || stalenessLevel(latest.createdAt) !== "stale"))
+        return false;
+
+      if (filters.verdict !== "ALL") {
+        if (!latest || latest.valuationVerdict !== (filters.verdict as ValuationVerdict))
+          return false;
+      }
+
+      if (filters.minScore > 0) {
+        if (!latest || (latest.recommendationScore ?? 0) < filters.minScore) return false;
+      }
+
+      return true;
+    });
+  }, [candidates, filters, onlyLatestScan, actionableOnly, latestDate]);
+
+  const isFiltered =
+    JSON.stringify(filters) !== JSON.stringify(DEFAULT_FILTERS) || onlyLatestScan || actionableOnly;
 
   async function handleStatusChange(id: string, newStatus: Status) {
     setCandidates((prev) =>
@@ -108,28 +225,45 @@ export default function DashboardPage() {
       </div>
 
       {!loading && candidates.length > 0 && (
-        <div className="mt-6 flex flex-wrap gap-3">
-          {STATUS_OPTIONS.map(([value]) => (
-            <div
-              key={value}
-              className="rounded-md border border-gray-200 bg-white px-3 py-2 text-center"
-            >
-              <div className="text-lg font-semibold text-gray-900">{statusCounts[value]}</div>
-              <div className="text-xs text-gray-600">{STATUS_LABELS[value]}</div>
-            </div>
-          ))}
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <DecisionTile
+            label="Needs research"
+            value={needsResearchCount}
+            active={filters.research === "NEEDS"}
+            onClick={() => toggleTile({ research: "NEEDS" })}
+          />
+          <DecisionTile
+            label="Actionable"
+            value={actionableCount}
+            active={actionableOnly}
+            highlight
+            onClick={() => toggleTile({ quick: "actionable" })}
+          />
+          <DecisionTile
+            label="Going stale"
+            value={staleCount}
+            active={filters.research === "STALE"}
+            onClick={() => toggleTile({ research: "STALE" })}
+          />
+          <DecisionTile
+            label="Last scan"
+            value={lastScanCount}
+            active={onlyLatestScan}
+            onClick={() => toggleTile({ scan: "latest" })}
+          />
         </div>
       )}
 
-      <div className="mt-6 flex items-center justify-between">
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
         <FilterBar
-          theme={theme}
-          status={status}
-          onThemeChange={setTheme}
-          onStatusChange={setStatus}
+          filters={filters}
+          onChange={updateUrl}
+          onReset={resetFilters}
+          isFiltered={isFiltered}
         />
-        <span className="text-sm text-gray-600">
-          {candidates.length} candidate{candidates.length === 1 ? "" : "s"}
+        <span className="whitespace-nowrap text-sm text-gray-600">
+          {filtered.length} of {candidates.length} candidate
+          {candidates.length === 1 ? "" : "s"}
         </span>
       </div>
 
@@ -138,7 +272,7 @@ export default function DashboardPage() {
           <div className="p-10 text-center text-sm text-gray-600">Loading…</div>
         ) : (
           <CandidateTable
-            candidates={candidates}
+            candidates={filtered}
             latestDate={latestDate}
             runningIds={runningIds}
             onStatusChange={handleStatusChange}
@@ -148,5 +282,53 @@ export default function DashboardPage() {
         )}
       </div>
     </main>
+  );
+}
+
+function DecisionTile({
+  label,
+  value,
+  active,
+  highlight,
+  onClick,
+}: {
+  label: string;
+  value: number;
+  active: boolean;
+  highlight?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`rounded-md border px-3 py-2 text-left transition ${
+        active
+          ? "border-blue-500 bg-blue-50"
+          : highlight && value > 0
+            ? "border-green-200 bg-green-50 hover:border-green-400"
+            : "border-gray-200 bg-white hover:border-gray-400"
+      }`}
+    >
+      <div
+        className={`text-lg font-semibold ${
+          highlight && value > 0 && !active ? "text-green-700" : "text-gray-900"
+        }`}
+      >
+        {value}
+      </div>
+      <div className="text-xs text-gray-600">{label}</div>
+    </button>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="mx-auto max-w-6xl px-4 py-10 text-sm text-gray-600">Loading…</main>
+      }
+    >
+      <DashboardContent />
+    </Suspense>
   );
 }

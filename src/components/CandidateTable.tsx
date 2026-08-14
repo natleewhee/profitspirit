@@ -21,9 +21,12 @@ import {
   formatRelativeDate,
   stalenessLevel,
   STALENESS_TEXT_STYLES,
+  VALUATION_CELL_OPACITY,
+  formatAsOfTooltip,
 } from "@/lib/ui";
+import { computeValuationGapPct } from "@/lib/research/gap";
 
-type SortKey = "dateScanned" | "ticker";
+type SortKey = "dateScanned" | "ticker" | "score" | "gap" | "researched";
 
 type Props = {
   candidates: CandidateWithLatest[];
@@ -82,7 +85,30 @@ export function CandidateTable({
   const [sortKey, setSortKey] = useState<SortKey>("dateScanned");
   const [sortAsc, setSortAsc] = useState(false);
 
+  // Score/gap/researched are only meaningful once a candidate has been
+  // researched — rows with no scorecard always sort to the bottom
+  // regardless of direction, so they never scatter through a ranked list.
   const sorted = [...candidates].sort((a, b) => {
+    if (sortKey === "score" || sortKey === "gap" || sortKey === "researched") {
+      const aLatest = a.scorecards[0] ?? null;
+      const bLatest = b.scorecards[0] ?? null;
+      if (!aLatest && !bLatest) return 0;
+      if (!aLatest) return 1;
+      if (!bLatest) return -1;
+
+      let cmp = 0;
+      if (sortKey === "score") {
+        cmp = (aLatest.recommendationScore ?? -1) - (bLatest.recommendationScore ?? -1);
+      } else if (sortKey === "gap") {
+        const aGap = computeValuationGapPct(aLatest.currentPrice, aLatest.fairValueEstimate);
+        const bGap = computeValuationGapPct(bLatest.currentPrice, bLatest.fairValueEstimate);
+        cmp = (aGap ?? -Infinity) - (bGap ?? -Infinity);
+      } else {
+        cmp = new Date(aLatest.createdAt).getTime() - new Date(bLatest.createdAt).getTime();
+      }
+      return sortAsc ? cmp : -cmp;
+    }
+
     let cmp = 0;
     if (sortKey === "dateScanned") {
       cmp = new Date(a.dateScanned).getTime() - new Date(b.dateScanned).getTime();
@@ -115,12 +141,12 @@ export function CandidateTable({
         <thead className="bg-gray-50">
           <tr>
             <Th onClick={() => toggleSort("ticker")}>Ticker</Th>
-            <th className="px-4 py-2 text-left font-medium text-gray-600">Score</th>
+            <Th onClick={() => toggleSort("score")}>Score</Th>
             <th className="px-4 py-2 text-left font-medium text-gray-600">Call</th>
-            <th className="px-4 py-2 text-left font-medium text-gray-600">Valuation</th>
+            <Th onClick={() => toggleSort("gap")}>Valuation</Th>
             <th className="px-4 py-2 text-left font-medium text-gray-600">Price</th>
             <th className="px-4 py-2 text-left font-medium text-gray-600">Risk</th>
-            <Th onClick={() => toggleSort("dateScanned")}>Researched</Th>
+            <Th onClick={() => toggleSort("researched")}>Researched</Th>
             <th className="px-4 py-2 text-left font-medium text-gray-600">Status</th>
             <th className="px-4 py-2" />
           </tr>
@@ -183,7 +209,10 @@ export function CandidateTable({
                     <td className="whitespace-nowrap px-4 py-2 text-gray-700">
                       {RECOMMENDATION_LABELS[latest.recommendation]}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-2">
+                    <td
+                      className={`whitespace-nowrap px-4 py-2 ${VALUATION_CELL_OPACITY[stalenessLevel(latest.createdAt)]}`}
+                      title={formatAsOfTooltip(latest.createdAt)}
+                    >
                       <span
                         className={`rounded-full px-2 py-0.5 text-xs font-medium ${VALUATION_VERDICT_STYLES[latest.valuationVerdict]}`}
                       >
