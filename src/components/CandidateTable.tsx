@@ -3,28 +3,31 @@
 import Link from "next/link";
 import { useState } from "react";
 import { CandidateWithLatest, LiveQuote } from "@/lib/types";
-import { Status, ConfidenceRead } from "@prisma/client";
-import {
-  STATUS_OPTIONS,
-  RECOMMENDATION_LABELS,
-  VALUATION_VERDICT_LABELS,
-  RISK_LEVEL_LABELS,
-} from "@/lib/labels";
+import { ConfidenceRead } from "@prisma/client";
+import { VALUATION_VERDICT_LABELS } from "@/lib/labels";
 import {
   RECOMMENDATION_BORDER,
   VALUATION_VERDICT_STYLES,
-  RISK_LEVEL_STYLES,
   scoreStyles,
   scoreBarStyle,
+  qualityStyles,
+  qualityBarStyle,
+  RISK_SCORE_DOT_STYLES,
   formatPrice,
-  formatGap,
   formatRelativeDate,
   stalenessLevel,
   STALENESS_TEXT_STYLES,
   VALUATION_CELL_OPACITY,
   formatAsOfTooltip,
+  formatEntryZone,
+  formatEntryDistance,
+  format52WeekPosition,
+  formatTrend,
+  formatMarketCap,
+  formatEarningsProximity,
 } from "@/lib/ui";
 import { computeValuationGapPct } from "@/lib/research/gap";
+import { deriveRiskLevel } from "@/lib/research/risk";
 
 type SortKey = "dateScanned" | "ticker" | "score" | "gap" | "researched";
 
@@ -33,7 +36,6 @@ type Props = {
   latestDate: string | null;
   runningIds: Set<string>;
   liveQuotes: Record<string, LiveQuote>;
-  onStatusChange: (id: string, status: Status) => void;
   onDelete: (id: string) => void;
   onRunResearch: (id: string) => void;
 };
@@ -45,7 +47,7 @@ function LivePriceChip({ quote }: { quote: LiveQuote | undefined }) {
   const changeColor = up ? "text-green-700" : "text-red-700";
 
   return (
-    <div className="mt-0.5">
+    <div>
       <span className="text-gray-900">{formatPrice(quote.regularMarketPrice)}</span>{" "}
       {quote.regularMarketChangePercent !== null && (
         <span className={`text-xs font-medium ${changeColor}`}>
@@ -93,6 +95,21 @@ function ConfidenceDots({ confidence }: { confidence: ConfidenceRead }) {
   );
 }
 
+function RiskDots({ riskScore }: { riskScore: number | null }) {
+  const level = deriveRiskLevel(riskScore);
+  const filled = riskScore ?? 0;
+  return (
+    <span className="inline-flex items-center gap-0.5" title={`Risk ${riskScore ?? "—"}/5`}>
+      {[1, 2, 3, 4, 5].map((i) => (
+        <span
+          key={i}
+          className={`h-1.5 w-1.5 rounded-full ${i <= filled ? RISK_SCORE_DOT_STYLES[level] : "bg-gray-300"}`}
+        />
+      ))}
+    </span>
+  );
+}
+
 function DeltaChip({ latest, previous }: { latest: number | null; previous: number | null }) {
   if (latest === null || previous === null) return null;
   const diff = latest - previous;
@@ -111,7 +128,6 @@ export function CandidateTable({
   latestDate,
   runningIds,
   liveQuotes,
-  onStatusChange,
   onDelete,
   onRunResearch,
 }: Props) {
@@ -175,15 +191,15 @@ export function CandidateTable({
           <tr>
             <Th onClick={() => toggleSort("ticker")}>Ticker</Th>
             <Th onClick={() => toggleSort("score")}>Score</Th>
-            <th className="px-4 py-2 text-left font-medium text-gray-600">Call</th>
             <Th onClick={() => toggleSort("gap")}>Valuation</Th>
+            <th className="px-4 py-2 text-left font-medium text-gray-600">Quality</th>
+            <th className="px-4 py-2 text-left font-medium text-gray-600">Risk</th>
+            <th className="px-4 py-2 text-left font-medium text-gray-600">Entry zone</th>
             <th className="px-4 py-2 text-left font-medium text-gray-600">
               Price
               <div className="text-[10px] font-normal normal-case text-gray-400">live / at research</div>
             </th>
-            <th className="px-4 py-2 text-left font-medium text-gray-600">Risk</th>
             <Th onClick={() => toggleSort("researched")}>Researched</Th>
-            <th className="px-4 py-2 text-left font-medium text-gray-600">Status</th>
             <th className="px-4 py-2" />
           </tr>
         </thead>
@@ -193,6 +209,7 @@ export function CandidateTable({
             const latest = c.scorecards[0];
             const previous = c.scorecards[1];
             const running = runningIds.has(c.id);
+            const liveQuote = liveQuotes[c.ticker];
 
             const rowBorder = latest ? RECOMMENDATION_BORDER[latest.recommendation] : "border-l-gray-200";
 
@@ -208,10 +225,13 @@ export function CandidateTable({
                     )}
                   </div>
                   {latest?.sector && <div className="text-xs text-gray-500">{latest.sector}</div>}
+                  {latest?.marketCap !== null && latest?.marketCap !== undefined && (
+                    <div className="text-xs text-gray-400">{formatMarketCap(latest.marketCap)}</div>
+                  )}
                 </td>
 
                 {c.scorecardCount === 0 ? (
-                  <td colSpan={6} className="px-4 py-2 text-gray-600">
+                  <td colSpan={7} className="px-4 py-2 text-gray-600">
                     <div className="flex items-center gap-3">
                       <span>Not researched yet</span>
                       <button
@@ -242,44 +262,75 @@ export function CandidateTable({
                         previous={previous?.recommendationScore ?? null}
                       />
                     </td>
-                    <td className="whitespace-nowrap px-4 py-2 text-gray-700">
-                      {RECOMMENDATION_LABELS[latest.recommendation]}
-                    </td>
                     <td
                       className={`whitespace-nowrap px-4 py-2 ${VALUATION_CELL_OPACITY[stalenessLevel(latest.createdAt)]}`}
                       title={formatAsOfTooltip(latest.createdAt)}
                     >
+                      <div
+                        className={`inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 font-bold ${scoreStyles(latest.valuationScore)}`}
+                      >
+                        {latest.valuationScore ?? "—"}
+                      </div>
+                      <div className="mt-1 h-1 w-16 rounded-full bg-gray-200">
+                        <div
+                          className={`h-1 rounded-full ${scoreBarStyle(latest.valuationScore)}`}
+                          style={{ width: `${latest.valuationScore ?? 0}%` }}
+                        />
+                      </div>
                       <span
-                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${VALUATION_VERDICT_STYLES[latest.valuationVerdict]}`}
+                        className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${VALUATION_VERDICT_STYLES[latest.valuationVerdict]}`}
                       >
                         {VALUATION_VERDICT_LABELS[latest.valuationVerdict]}
                       </span>
-                      <div className="mt-0.5 text-xs text-gray-600">
-                        {formatGap(latest.currentPrice, latest.fairValueEstimate)}
-                        {latest.fairValueEstimate !== null &&
-                          ` vs ${formatPrice(latest.fairValueEstimate)}`}
-                      </div>
                     </td>
                     <td className="whitespace-nowrap px-4 py-2">
-                      <LivePriceChip quote={liveQuotes[c.ticker]} />
-                      <div className="text-xs text-gray-500">
-                        {formatPrice(latest.currentPrice)} at research
-                      </div>
-                      {latest.entryPriceEstimate !== null && (
-                        <div className="text-xs text-gray-500">
-                          → {formatPrice(latest.entryPriceEstimate)} entry
-                        </div>
-                      )}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-2">
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${RISK_LEVEL_STYLES[latest.riskLevel]}`}
+                      <div
+                        className={`inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 font-bold ${qualityStyles(latest.qualityScore)}`}
                       >
-                        {RISK_LEVEL_LABELS[latest.riskLevel]}
-                      </span>
+                        {latest.qualityScore ?? "—"}
+                      </div>
+                      <div className="mt-1 h-1 w-16 rounded-full bg-gray-200">
+                        <div
+                          className={`h-1 rounded-full ${qualityBarStyle(latest.qualityScore)}`}
+                          style={{ width: `${latest.qualityScore ?? 0}%` }}
+                        />
+                      </div>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-2">
+                      <RiskDots riskScore={latest.riskScore} />
                       <div className="mt-1">
                         <ConfidenceDots confidence={latest.confidenceRead} />
                       </div>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-2">
+                      <div className="text-gray-900">
+                        {formatEntryZone(latest.entryZoneLow, latest.entryZoneHigh)}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {formatEntryDistance(
+                          liveQuote?.regularMarketPrice ?? latest.currentPrice,
+                          latest.entryZoneLow,
+                          latest.entryZoneHigh
+                        )}
+                      </div>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-2">
+                      <LivePriceChip quote={liveQuote} />
+                      <div className="text-xs text-gray-500">
+                        {formatPrice(latest.currentPrice)} at research
+                      </div>
+                      {format52WeekPosition(latest.currentPrice, latest.fiftyTwoWeekLow, latest.fiftyTwoWeekHigh) && (
+                        <div className="text-xs text-gray-400">
+                          {format52WeekPosition(latest.currentPrice, latest.fiftyTwoWeekLow, latest.fiftyTwoWeekHigh)}
+                          {formatTrend(latest.currentPrice, latest.fiftyDayAverage, latest.twoHundredDayAverage) &&
+                            ` · ${formatTrend(latest.currentPrice, latest.fiftyDayAverage, latest.twoHundredDayAverage)}`}
+                        </div>
+                      )}
+                      {formatEarningsProximity(latest.nextEarningsDate) && (
+                        <div className="text-xs font-medium text-amber-700">
+                          {formatEarningsProximity(latest.nextEarningsDate)}
+                        </div>
+                      )}
                     </td>
                     <td
                       className={`whitespace-nowrap px-4 py-2 ${STALENESS_TEXT_STYLES[stalenessLevel(latest.createdAt)]}`}
@@ -290,21 +341,17 @@ export function CandidateTable({
                   </>
                 )}
 
-                <td className="whitespace-nowrap px-4 py-2">
-                  <select
-                    className="rounded border-none bg-transparent text-xs focus:ring-1 focus:ring-blue-400"
-                    value={c.status}
-                    onChange={(e) => onStatusChange(c.id, e.target.value as Status)}
-                  >
-                    {STATUS_OPTIONS.map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-                </td>
                 <td className="whitespace-nowrap px-4 py-2 text-right">
-                  <Link href={`/candidates/${c.id}`} className="text-blue-600 hover:underline">
+                  {c.scorecardCount > 0 && (
+                    <button
+                      onClick={() => onRunResearch(c.id)}
+                      disabled={running}
+                      className="text-blue-600 hover:underline disabled:opacity-50"
+                    >
+                      {running ? "Running…" : "Re-research"}
+                    </button>
+                  )}
+                  <Link href={`/candidates/${c.id}`} className="ml-3 text-blue-600 hover:underline">
                     Detail
                   </Link>
                   <Link

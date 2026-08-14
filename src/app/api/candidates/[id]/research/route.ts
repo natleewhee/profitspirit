@@ -7,6 +7,9 @@ import type { Scorecard as AgentScorecard } from "@/lib/research/scorecard";
 import { buildScorecardExtras } from "@/lib/research/enrich";
 import type { DataQuality as AgentDataQuality } from "@/lib/research/enrich";
 import { computeValuation, type ValuationVerdict as AgentValuationVerdict } from "@/lib/research/valuation";
+import { computeValuationGapPct, computeValuationScore } from "@/lib/research/gap";
+import { computeQualityScore } from "@/lib/research/quality";
+import { computeRiskScore, deriveRiskLevel, type RiskLevelBucket } from "@/lib/research/risk";
 import {
   computeRecommendationScore,
   deriveRecommendation,
@@ -24,7 +27,7 @@ const CONFIDENCE_MAP: Record<AgentScorecard["confidenceRead"], "LOW" | "MEDIUM" 
   high: "HIGH",
 };
 
-const RISK_LEVEL_MAP: Record<AgentScorecard["riskLevel"], "LOW" | "MEDIUM" | "HIGH"> = {
+const RISK_LEVEL_MAP: Record<RiskLevelBucket, "LOW" | "MEDIUM" | "HIGH"> = {
   low: "LOW",
   medium: "MEDIUM",
   high: "HIGH",
@@ -88,10 +91,21 @@ export async function POST(
   const extras = buildScorecardExtras(fundamentals, market);
   const valuation = computeValuation(fundamentals, market);
   const cappedConfidence = capConfidenceByDataQuality(agentScorecard.confidenceRead, extras.dataQuality);
+
+  const gapPct = computeValuationGapPct(extras.currentPrice, valuation.fairValueEstimate);
+  const valuationScore = computeValuationScore(gapPct);
+  const qualityScore = fundamentals.found ? computeQualityScore(fundamentals.keyRatios) : null;
+  const riskScore = computeRiskScore({
+    debtToEquity: fundamentals.found ? fundamentals.keyRatios.debtToEquity : null,
+    currentRatio: fundamentals.found ? fundamentals.keyRatios.currentRatio : null,
+    recentClose: market.found ? market.recentClose : [],
+  });
+  const riskLevel = deriveRiskLevel(riskScore);
+
   const recommendationScore = computeRecommendationScore(
-    extras.currentPrice,
-    valuation.fairValueEstimate,
-    agentScorecard.riskLevel,
+    valuationScore,
+    qualityScore,
+    riskScore,
     cappedConfidence
   );
   const recommendation = deriveRecommendation(recommendationScore);
@@ -106,17 +120,29 @@ export async function POST(
       bearCase: agentScorecard.bearCase,
       confidenceRead: CONFIDENCE_MAP[cappedConfidence],
       riskFlags: agentScorecard.riskFlags,
-      riskLevel: RISK_LEVEL_MAP[agentScorecard.riskLevel],
+      riskLevel: RISK_LEVEL_MAP[riskLevel],
+      riskScore,
       recommendation: RECOMMENDATION_MAP[recommendation],
       recommendationScore,
+      valuationScore,
+      qualityScore,
       entryPriceEstimate: valuation.entryPriceEstimate,
       fairValueEstimate: valuation.fairValueEstimate,
+      entryZoneLow: valuation.entryZoneLow,
+      entryZoneHigh: valuation.entryZoneHigh,
       valuationVerdict: VALUATION_VERDICT_MAP[valuation.valuationVerdict],
       targetsBasis: valuation.targetsBasis,
       currentPrice: extras.currentPrice,
       sector: extras.sector,
       industry: extras.industry,
       dataQuality: DATA_QUALITY_MAP[extras.dataQuality],
+      marketCap: market.found ? market.marketCap : null,
+      fiftyTwoWeekHigh: market.found ? market.fiftyTwoWeekHigh : null,
+      fiftyTwoWeekLow: market.found ? market.fiftyTwoWeekLow : null,
+      fiftyDayAverage: market.found ? market.fiftyDayAverage : null,
+      twoHundredDayAverage: market.found ? market.twoHundredDayAverage : null,
+      nextEarningsDate:
+        market.found && market.nextEarningsDate ? new Date(market.nextEarningsDate) : null,
     },
   });
 

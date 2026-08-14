@@ -31,8 +31,8 @@ export async function PATCH(
     data: {
       ...(ticker !== undefined && { ticker: ticker.toUpperCase().trim() }),
       ...(dateScanned !== undefined && { dateScanned: new Date(dateScanned) }),
-      ...(theme !== undefined && { theme }),
-      ...(triggerReason !== undefined && { triggerReason }),
+      ...(theme !== undefined && { theme: theme || null }),
+      ...(triggerReason !== undefined && { triggerReason: triggerReason || null }),
       ...(status !== undefined && { status }),
       ...(notes !== undefined && { notes: notes || null }),
     },

@@ -33,10 +33,21 @@ export async function GET(request: NextRequest) {
           fairValueEstimate: true,
           currentPrice: true,
           entryPriceEstimate: true,
+          entryZoneLow: true,
+          entryZoneHigh: true,
           riskLevel: true,
+          riskScore: true,
           confidenceRead: true,
           dataQuality: true,
           sector: true,
+          valuationScore: true,
+          qualityScore: true,
+          marketCap: true,
+          fiftyTwoWeekHigh: true,
+          fiftyTwoWeekLow: true,
+          fiftyDayAverage: true,
+          twoHundredDayAverage: true,
+          nextEarningsDate: true,
         },
       },
       _count: { select: { scorecards: true } },
@@ -56,19 +67,16 @@ export async function POST(request: NextRequest) {
 
   const { ticker, dateScanned, theme, triggerReason, status, notes } = body;
 
-  if (!ticker || !dateScanned || !theme || !triggerReason) {
-    return NextResponse.json(
-      { error: "ticker, dateScanned, theme, and triggerReason are required" },
-      { status: 400 }
-    );
+  if (!ticker) {
+    return NextResponse.json({ error: "ticker is required" }, { status: 400 });
   }
 
   const candidate = await prisma.candidate.create({
     data: {
       ticker: ticker.toUpperCase().trim(),
-      dateScanned: new Date(dateScanned),
-      theme,
-      triggerReason,
+      dateScanned: dateScanned ? new Date(dateScanned) : new Date(),
+      theme: theme || null,
+      triggerReason: triggerReason || null,
       status: status ?? "NEW",
       notes: notes || null,
     },

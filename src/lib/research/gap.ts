@@ -11,3 +11,17 @@ export function computeValuationGapPct(
   if (currentPrice === null || fairValueEstimate === null || currentPrice <= 0) return null;
   return (fairValueEstimate - currentPrice) / currentPrice;
 }
+
+// Gaps beyond +/-50% saturate rather than scaling further — a 200% gap
+// isn't 4x more meaningful than a 50% one.
+const GAP_SATURATION = 0.5;
+
+// Pure cheapness, 0-100, deliberately separate from the composite
+// recommendationScore (score.ts) — this is "how far below/above fair
+// value", nothing about business quality or risk. 100 = deeply
+// undervalued, 0 = deeply overvalued, 50 = fairly valued.
+export function computeValuationScore(gapPct: number | null): number | null {
+  if (gapPct === null) return null;
+  const clampedGap = Math.max(-GAP_SATURATION, Math.min(GAP_SATURATION, gapPct));
+  return Math.round(50 + (clampedGap / GAP_SATURATION) * 50);
+}

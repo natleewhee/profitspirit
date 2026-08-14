@@ -19,7 +19,7 @@ export function CandidateForm({ initial }: Props) {
   const [dateScanned, setDateScanned] = useState(
     initial ? initial.dateScanned.slice(0, 10) : todayIso()
   );
-  const [theme, setTheme] = useState(initial?.theme ?? THEME_OPTIONS[0][0]);
+  const [theme, setTheme] = useState(initial?.theme ?? "");
   const [triggerReason, setTriggerReason] = useState(initial?.triggerReason ?? "");
   const [status, setStatus] = useState(initial?.status ?? "NEW");
   const [notes, setNotes] = useState(initial?.notes ?? "");
@@ -83,12 +83,13 @@ export function CandidateForm({ initial }: Props) {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700">Theme</label>
+        <label className="block text-sm font-medium text-gray-700">Theme (optional)</label>
         <select
           value={theme}
           onChange={(e) => setTheme(e.target.value as typeof theme)}
           className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
         >
+          <option value="">— None —</option>
           {THEME_OPTIONS.map(([value, label]) => (
             <option key={value} value={value}>
               {label}
@@ -98,9 +99,8 @@ export function CandidateForm({ initial }: Props) {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700">Trigger Reason</label>
+        <label className="block text-sm font-medium text-gray-700">Trigger Reason (optional)</label>
         <input
-          required
           value={triggerReason}
           onChange={(e) => setTriggerReason(e.target.value)}
           placeholder="Broke 3-month high on 2x volume"

@@ -1,21 +1,22 @@
-// Deterministic recommendation scoring — NOT LLM-generated. Combines the
-// valuation gap (gap.ts), risk level, and confidence (both from the
-// Synthesizer, confidence capped by dataQuality) into a single 0-100 score,
-// and derives the categorical recommendation from that score rather than
-// letting the LLM pick a label independently — the label can never
-// contradict the number this way.
-import { computeValuationGapPct } from "./gap";
-
-export type RiskLevel = "low" | "medium" | "high";
+// Deterministic recommendation scoring — NOT LLM-generated. A weighted
+// composite of three independent axes (valuationScore from gap.ts,
+// qualityScore from quality.ts, riskScore from risk.ts), damped by
+// confidence, then derives the categorical recommendation from that score
+// rather than letting the LLM pick a label independently — the label can
+// never contradict the number this way.
+//
+// Kept deliberately separate from valuationScore: a stock can be cheap
+// (high valuationScore) and still score low overall if it's a bad business
+// or carries real risk — that gap between the two numbers is the value-trap
+// signal, and collapsing them into one number would erase it.
 export type ConfidenceRead = "low" | "medium" | "high";
 export type RecommendationBucket = "watch" | "research_further" | "pass";
 
-const RISK_MULTIPLIER: Record<RiskLevel, number> = { low: 1, medium: 0.75, high: 0.5 };
 const CONFIDENCE_MULTIPLIER: Record<ConfidenceRead, number> = { high: 1, medium: 0.75, low: 0.5 };
 
-// Valuation gaps beyond +/-50% saturate the score at 0/100 rather than
-// scaling further — a 200% gap isn't 4x more meaningful than a 50% one.
-const GAP_SATURATION = 0.5;
+const WEIGHT_VALUATION = 0.5;
+const WEIGHT_QUALITY = 0.3;
+const WEIGHT_RISK = 0.2;
 
 // The two thresholds that turn a score into a recommendation bucket.
 // Exported so the UI (filter presets, score-pill coloring) reuses these
@@ -24,19 +25,27 @@ export const WATCH_THRESHOLD = 65;
 export const RESEARCH_FURTHER_THRESHOLD = 35;
 
 export function computeRecommendationScore(
-  currentPrice: number | null,
-  fairValueEstimate: number | null,
-  riskLevel: RiskLevel,
+  valuationScore: number | null,
+  qualityScore: number | null,
+  riskScore: number | null, // 1 (low risk) - 5 (high risk)
   confidenceRead: ConfidenceRead
 ): number | null {
-  const gapPct = computeValuationGapPct(currentPrice, fairValueEstimate);
-  if (gapPct === null) return null;
+  // Valuation is the primary axis — without it there's no basis for a
+  // recommendation, same as the old gap-only version.
+  if (valuationScore === null) return null;
 
-  const clampedGap = Math.max(-GAP_SATURATION, Math.min(GAP_SATURATION, gapPct));
-  const baseScore = 50 + (clampedGap / GAP_SATURATION) * 50;
+  // Risk score inverted to a 0-100 "safety" component so all three axes
+  // point the same direction (higher = better) before weighting.
+  const riskComponent = riskScore === null ? null : ((5 - riskScore) / 4) * 100;
 
-  const damping = RISK_MULTIPLIER[riskLevel] * CONFIDENCE_MULTIPLIER[confidenceRead];
-  const adjusted = 50 + (baseScore - 50) * damping;
+  const weighted: [number, number][] = [[valuationScore, WEIGHT_VALUATION]];
+  if (qualityScore !== null) weighted.push([qualityScore, WEIGHT_QUALITY]);
+  if (riskComponent !== null) weighted.push([riskComponent, WEIGHT_RISK]);
+
+  const totalWeight = weighted.reduce((sum, [, w]) => sum + w, 0);
+  const baseScore = weighted.reduce((sum, [s, w]) => sum + s * w, 0) / totalWeight;
+
+  const adjusted = 50 + (baseScore - 50) * CONFIDENCE_MULTIPLIER[confidenceRead];
 
   return Math.round(Math.max(0, Math.min(100, adjusted)));
 }

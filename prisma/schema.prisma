@@ -40,8 +40,8 @@ enum Recommendation {
   PASS
 }
 
-// LLM-judged, grounded in explicit risk signals fed into the Synthesizer
-// prompt (debt/liquidity ratios, price volatility) — see agents.ts.
+// Derived deterministically from riskScore (risk.ts) via fixed thresholds —
+// not an LLM judgment. See Scorecard.riskScore.
 enum RiskLevel {
   LOW
   MEDIUM
@@ -70,8 +70,10 @@ model Candidate {
   id            String      @id @default(cuid())
   ticker        String
   dateScanned   DateTime
-  theme         Theme
-  triggerReason String
+  // Optional now — the add-candidate flow is ticker-only (see AddCandidateModal);
+  // theme/triggerReason survive as later-editable annotations, not required input.
+  theme         Theme?
+  triggerReason String?
   status        Status      @default(NEW)
   notes         String?
   createdAt     DateTime    @default(now())
@@ -82,28 +84,51 @@ model Candidate {
 // Phase 2 — one row per research-agent run (docs/research-agent-scope.md §5).
 // A candidate can be re-researched over time, so this is a history, not a 1:1.
 model Scorecard {
-  id                  String           @id @default(cuid())
-  candidateId         String
-  candidate           Candidate        @relation(fields: [candidateId], references: [id], onDelete: Cascade)
-  asOf                DateTime
-  fundamentalsSummary String
-  technicalsSummary   String
-  bullCase            String
-  bearCase            String
-  confidenceRead      ConfidenceRead
-  riskFlags           String[]
-  recommendation      Recommendation
-  entryPriceEstimate  Float?
-  fairValueEstimate   Float?
-  targetsBasis        String
-  currentPrice        Float?
-  sector              String?
-  industry            String?
-  dataQuality         DataQuality
-  riskLevel           RiskLevel
-  valuationVerdict    ValuationVerdict
-  recommendationScore Int?
-  createdAt           DateTime         @default(now())
+  id                   String           @id @default(cuid())
+  candidateId          String
+  candidate            Candidate        @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  asOf                 DateTime
+  fundamentalsSummary  String
+  technicalsSummary    String
+  bullCase             String
+  bearCase             String
+  confidenceRead       ConfidenceRead
+  riskFlags            String[]
+  recommendation       Recommendation
+  entryPriceEstimate   Float?
+  fairValueEstimate    Float?
+  targetsBasis         String
+  currentPrice         Float?
+  sector               String?
+  industry             String?
+  dataQuality          DataQuality
+  riskLevel            RiskLevel
+  valuationVerdict     ValuationVerdict
+  // Composite 0-100: weighted blend of valuationScore, qualityScore, and
+  // risk, damped by confidence. See score.ts.
+  recommendationScore  Int?
+  // Pure cheapness, 0-100 (100 = deeply undervalued, 0 = deeply overvalued).
+  // Deliberately separate from recommendationScore — otherwise a value trap
+  // (cheap + bad business) and a genuine bargain look identical. See gap.ts.
+  valuationScore       Int?
+  // Business-quality composite, 0-100, from ROE/margins/revenue growth/FCF.
+  // See quality.ts. Null when too little fundamentals data to compute.
+  qualityScore         Int?
+  // 1 (low risk) - 5 (high risk), deterministic from leverage, liquidity,
+  // and price volatility. riskLevel above is derived from this. See risk.ts.
+  riskScore            Int?
+  // Suggested buy zone — fairValueEstimate with a 20-30% margin of safety
+  // band, replacing the old single-point entryPriceEstimate with a range.
+  // entryPriceEstimate is kept as the band's midpoint for backward compat.
+  entryZoneLow         Float?
+  entryZoneHigh        Float?
+  marketCap            Float?
+  fiftyTwoWeekHigh     Float?
+  fiftyTwoWeekLow      Float?
+  fiftyDayAverage      Float?
+  twoHundredDayAverage Float?
+  nextEarningsDate     DateTime?
+  createdAt            DateTime         @default(now())
 
   @@index([candidateId])
 }

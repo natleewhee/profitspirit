@@ -1,22 +1,23 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CandidateWithLatest, LiveQuote } from "@/lib/types";
 import { Status, ValuationVerdict } from "@prisma/client";
 import { CandidateTable } from "@/components/CandidateTable";
 import { FilterBar, DEFAULT_FILTERS, Filters } from "@/components/FilterBar";
+import { AddCandidateModal } from "@/components/AddCandidateModal";
 import { WATCH_THRESHOLD } from "@/lib/research/score";
 import { stalenessLevel } from "@/lib/ui";
 
+// Status is no longer a dashboard-level filter (declutter — see FilterBar),
+// but it still gates the "Actionable" tile: a name you've already marked
+// Passed or moved to Portfolio shouldn't keep surfacing as an open decision.
 const PASSIVE_STATUSES: Status[] = ["PASSED", "ADDED_TO_PORTFOLIO"];
 
 function filtersFromParams(params: URLSearchParams): Filters {
   return {
     q: params.get("q") ?? DEFAULT_FILTERS.q,
-    theme: params.get("theme") ?? DEFAULT_FILTERS.theme,
-    status: params.get("status") ?? DEFAULT_FILTERS.status,
     verdict: params.get("verdict") ?? DEFAULT_FILTERS.verdict,
     research: (params.get("research") as Filters["research"]) ?? DEFAULT_FILTERS.research,
     minScore: Number(params.get("minScore") ?? DEFAULT_FILTERS.minScore),
@@ -26,8 +27,6 @@ function filtersFromParams(params: URLSearchParams): Filters {
 function paramsFromFilters(filters: Filters, extra: Record<string, string | null>): string {
   const params = new URLSearchParams();
   if (filters.q) params.set("q", filters.q);
-  if (filters.theme !== "ALL") params.set("theme", filters.theme);
-  if (filters.status !== "ALL") params.set("status", filters.status);
   if (filters.verdict !== "ALL") params.set("verdict", filters.verdict);
   if (filters.research !== "ALL") params.set("research", filters.research);
   if (filters.minScore > 0) params.set("minScore", String(filters.minScore));
@@ -171,8 +170,6 @@ function DashboardContent() {
       }
 
       if (filters.q && !c.ticker.toUpperCase().includes(filters.q.toUpperCase())) return false;
-      if (filters.theme !== "ALL" && c.theme !== filters.theme) return false;
-      if (filters.status !== "ALL" && c.status !== filters.status) return false;
 
       if (filters.research === "NEEDS" && c.scorecardCount > 0) return false;
       if (filters.research === "RESEARCHED" && c.scorecardCount === 0) return false;
@@ -194,17 +191,6 @@ function DashboardContent() {
 
   const isFiltered =
     JSON.stringify(filters) !== JSON.stringify(DEFAULT_FILTERS) || onlyLatestScan || actionableOnly;
-
-  async function handleStatusChange(id: string, newStatus: Status) {
-    setCandidates((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, status: newStatus } : c))
-    );
-    await fetch(`/api/candidates/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: newStatus }),
-    });
-  }
 
   async function handleDelete(id: string) {
     if (!confirm("Remove this candidate?")) return;
@@ -244,12 +230,7 @@ function DashboardContent() {
             Weekly Finviz scan output, logged by theme and scan date.
           </p>
         </div>
-        <Link
-          href="/candidates/new"
-          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-        >
-          + Add Candidate
-        </Link>
+        <AddCandidateModal onAdded={load} />
       </div>
 
       {!loading && candidates.length > 0 && (
@@ -304,7 +285,6 @@ function DashboardContent() {
             latestDate={latestDate}
             runningIds={runningIds}
             liveQuotes={liveQuotes}
-            onStatusChange={handleStatusChange}
             onDelete={handleDelete}
             onRunResearch={handleRunResearch}
           />

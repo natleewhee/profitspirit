@@ -16,6 +16,9 @@ import {
 } from "../../src/lib/research/agents";
 import { buildScorecardExtras } from "../../src/lib/research/enrich";
 import { computeValuation } from "../../src/lib/research/valuation";
+import { computeValuationGapPct, computeValuationScore } from "../../src/lib/research/gap";
+import { computeQualityScore } from "../../src/lib/research/quality";
+import { computeRiskScore, deriveRiskLevel } from "../../src/lib/research/risk";
 import {
   computeRecommendationScore,
   deriveRecommendation,
@@ -57,10 +60,21 @@ async function runOne(ticker: string) {
   const extras = buildScorecardExtras(fundamentals, market);
   const valuation = computeValuation(fundamentals, market);
   const cappedConfidence = capConfidenceByDataQuality(scorecard.confidenceRead, extras.dataQuality);
+
+  const gapPct = computeValuationGapPct(extras.currentPrice, valuation.fairValueEstimate);
+  const valuationScore = computeValuationScore(gapPct);
+  const qualityScore = fundamentals.found ? computeQualityScore(fundamentals.keyRatios) : null;
+  const riskScore = computeRiskScore({
+    debtToEquity: fundamentals.found ? fundamentals.keyRatios.debtToEquity : null,
+    currentRatio: fundamentals.found ? fundamentals.keyRatios.currentRatio : null,
+    recentClose: market.found ? market.recentClose : [],
+  });
+  const riskLevel = deriveRiskLevel(riskScore);
+
   const recommendationScore = computeRecommendationScore(
-    extras.currentPrice,
-    valuation.fairValueEstimate,
-    scorecard.riskLevel,
+    valuationScore,
+    qualityScore,
+    riskScore,
     cappedConfidence
   );
   const recommendation = deriveRecommendation(recommendationScore);
@@ -70,6 +84,10 @@ async function runOne(ticker: string) {
     confidenceRead: cappedConfidence,
     ...extras,
     ...valuation,
+    riskLevel,
+    riskScore,
+    valuationScore,
+    qualityScore,
     recommendationScore,
     recommendation,
   };

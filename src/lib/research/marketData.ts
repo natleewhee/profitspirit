@@ -17,6 +17,9 @@ export type MarketDataBundle = {
   averageVolume: number | null;
   fiftyDayAverage: number | null;
   twoHundredDayAverage: number | null;
+  // ±2 days per Yahoo's own accuracy caveat — good enough for "reports
+  // soon" context, not exact.
+  nextEarningsDate: string | null;
   recentClose: { date: string; close: number }[];
 } | {
   found: false;
@@ -61,6 +64,9 @@ export async function fetchMarketData(ticker: string): Promise<MarketDataBundle>
       averageVolume: quote.averageDailyVolume3Month ?? null,
       fiftyDayAverage: quote.fiftyDayAverage ?? null,
       twoHundredDayAverage: quote.twoHundredDayAverage ?? null,
+      nextEarningsDate: quote.earningsTimestamp
+        ? quote.earningsTimestamp.toISOString().slice(0, 10)
+        : null,
       recentClose,
     };
   } catch (err) {

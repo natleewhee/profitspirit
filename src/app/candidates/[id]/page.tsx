@@ -81,8 +81,12 @@ export default async function CandidateDetailPage({
       {/* Candidate metadata demoted to a single compact line — it's input,
           not output. */}
       <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-600">
-        <span>{THEME_LABELS[candidate.theme]}</span>
-        <span>·</span>
+        {candidate.theme && (
+          <>
+            <span>{THEME_LABELS[candidate.theme]}</span>
+            <span>·</span>
+          </>
+        )}
         <span>scanned {formatDate(candidate.dateScanned.toISOString())}</span>
         <span>·</span>
         <span>
@@ -93,27 +97,31 @@ export default async function CandidateDetailPage({
         <StatusBadge status={candidate.status} />
       </div>
 
-      <details className="mt-4 rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
-        <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-gray-600">
-          Scan context
-        </summary>
-        <div className="mt-2 space-y-2">
-          <div>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-600">
-              Trigger reason
-            </h3>
-            <p className="mt-1 text-sm text-gray-800">{candidate.triggerReason}</p>
+      {(candidate.triggerReason || candidate.notes) && (
+        <details className="mt-4 rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+          <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-gray-600">
+            Scan context
+          </summary>
+          <div className="mt-2 space-y-2">
+            {candidate.triggerReason && (
+              <div>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-600">
+                  Trigger reason
+                </h3>
+                <p className="mt-1 text-sm text-gray-800">{candidate.triggerReason}</p>
+              </div>
+            )}
+            {candidate.notes && (
+              <div>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-600">
+                  Notes
+                </h3>
+                <p className="mt-1 text-sm text-gray-800">{candidate.notes}</p>
+              </div>
+            )}
           </div>
-          {candidate.notes && (
-            <div>
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-600">
-                Notes
-              </h3>
-              <p className="mt-1 text-sm text-gray-800">{candidate.notes}</p>
-            </div>
-          )}
-        </div>
-      </details>
+        </details>
+      )}
 
       <div className="mt-8">
         <ResearchPanel
@@ -122,6 +130,7 @@ export default async function CandidateDetailPage({
             ...sc,
             asOf: sc.asOf.toISOString(),
             createdAt: sc.createdAt.toISOString(),
+            nextEarningsDate: sc.nextEarningsDate ? sc.nextEarningsDate.toISOString() : null,
           }))}
         />
       </div>

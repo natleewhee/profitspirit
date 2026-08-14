@@ -14,13 +14,21 @@ export type ValuationVerdict = "undervalued" | "overvalued" | "fairly_valued" | 
 export type ValuationResult = {
   entryPriceEstimate: number | null;
   fairValueEstimate: number | null;
+  entryZoneLow: number | null;
+  entryZoneHigh: number | null;
   valuationVerdict: ValuationVerdict;
   targetsBasis: string;
 };
 
-// Margin of safety applied to fair value to get a suggested entry price —
-// classic value-investing convention, not derived from the data itself.
-const MARGIN_OF_SAFETY = 0.25;
+// Margin-of-safety band applied to fair value to get a suggested entry
+// zone — classic value-investing convention, not derived from the data
+// itself. A band (not a single point) is more honest than false precision:
+// "$70-80" is a real decision boundary, "$75.32" implies a certainty this
+// model doesn't have. entryPriceEstimate is kept as the band's midpoint for
+// backward compatibility with existing consumers (PriceBar, detail hero).
+const MARGIN_OF_SAFETY_LOW = 0.3; // top of the band = fair value x 0.70
+const MARGIN_OF_SAFETY_HIGH = 0.2; // bottom of the band = fair value x 0.80
+const MARGIN_OF_SAFETY = (MARGIN_OF_SAFETY_LOW + MARGIN_OF_SAFETY_HIGH) / 2;
 
 // Required annual FCF yield used by the FCF-yield method — equivalent to
 // valuing the business at ~12.5x free cash flow. A stated assumption, not a
@@ -101,6 +109,8 @@ export function computeValuation(
     return {
       entryPriceEstimate: null,
       fairValueEstimate: null,
+      entryZoneLow: null,
+      entryZoneHigh: null,
       valuationVerdict: "insufficient_data",
       targetsBasis: "No fundamentals data available to value this stock.",
     };
@@ -132,6 +142,8 @@ export function computeValuation(
     return {
       entryPriceEstimate: null,
       fairValueEstimate: null,
+      entryZoneLow: null,
+      entryZoneHigh: null,
       valuationVerdict: "insufficient_data",
       targetsBasis:
         "Neither valuation method could compute: needs positive trailing EPS (Graham's revised " +
@@ -142,6 +154,8 @@ export function computeValuation(
 
   const fairValueEstimate = estimates.reduce((a, b) => a + b, 0) / estimates.length;
   const entryPriceEstimate = fairValueEstimate * (1 - MARGIN_OF_SAFETY);
+  const entryZoneLow = fairValueEstimate * (1 - MARGIN_OF_SAFETY_LOW);
+  const entryZoneHigh = fairValueEstimate * (1 - MARGIN_OF_SAFETY_HIGH);
 
   const basisPrefix =
     estimates.length === 2
@@ -152,11 +166,18 @@ export function computeValuation(
       "heavy businesses) — the classic Graham Number would understate this stock, so it's excluded " +
       "in favor of the growth-adjusted formula above."
     : "";
-  const targetsBasis = `${basisPrefix} Entry price applies a ${(MARGIN_OF_SAFETY * 100).toFixed(0)}% margin of safety below fair value.${assetLightNote}`;
+  const targetsBasis = `${basisPrefix} Entry zone applies a ${(MARGIN_OF_SAFETY_HIGH * 100).toFixed(0)}-${(MARGIN_OF_SAFETY_LOW * 100).toFixed(0)}% margin of safety below fair value.${assetLightNote}`;
 
   const valuationVerdict = computeVerdict(market.found ? market.price : null, fairValueEstimate);
 
-  return { entryPriceEstimate, fairValueEstimate, valuationVerdict, targetsBasis };
+  return {
+    entryPriceEstimate,
+    fairValueEstimate,
+    entryZoneLow,
+    entryZoneHigh,
+    valuationVerdict,
+    targetsBasis,
+  };
 }
 
 function computeVerdict(currentPrice: number | null, fairValue: number | null): ValuationVerdict {

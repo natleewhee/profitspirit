@@ -12,8 +12,8 @@ export type Candidate = {
   id: string;
   ticker: string;
   dateScanned: string;
-  theme: Theme;
-  triggerReason: string;
+  theme: Theme | null;
+  triggerReason: string | null;
   status: Status;
   notes: string | null;
   createdAt: string;
@@ -33,14 +33,25 @@ export type Scorecard = {
   recommendation: Recommendation;
   entryPriceEstimate: number | null;
   fairValueEstimate: number | null;
+  entryZoneLow: number | null;
+  entryZoneHigh: number | null;
   targetsBasis: string;
   currentPrice: number | null;
   sector: string | null;
   industry: string | null;
   dataQuality: DataQuality;
   riskLevel: RiskLevel;
+  riskScore: number | null;
   valuationVerdict: ValuationVerdict;
   recommendationScore: number | null;
+  valuationScore: number | null;
+  qualityScore: number | null;
+  marketCap: number | null;
+  fiftyTwoWeekHigh: number | null;
+  fiftyTwoWeekLow: number | null;
+  fiftyDayAverage: number | null;
+  twoHundredDayAverage: number | null;
+  nextEarningsDate: string | null;
   createdAt: string;
 };
 
@@ -61,10 +72,21 @@ export type ScorecardSummary = Pick<
   | "fairValueEstimate"
   | "currentPrice"
   | "entryPriceEstimate"
+  | "entryZoneLow"
+  | "entryZoneHigh"
   | "riskLevel"
+  | "riskScore"
   | "confidenceRead"
   | "dataQuality"
   | "sector"
+  | "valuationScore"
+  | "qualityScore"
+  | "marketCap"
+  | "fiftyTwoWeekHigh"
+  | "fiftyTwoWeekLow"
+  | "fiftyDayAverage"
+  | "twoHundredDayAverage"
+  | "nextEarningsDate"
 >;
 
 // Latest-two scorecards (for the delta chip) plus a total count, attached
