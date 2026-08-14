@@ -6,56 +6,16 @@ import {
   RISK_LEVEL_LABELS,
   VALUATION_VERDICT_LABELS,
 } from "@/lib/labels";
-
-const CONFIDENCE_STYLES: Record<Scorecard["confidenceRead"], string> = {
-  LOW: "bg-gray-200 text-gray-800",
-  MEDIUM: "bg-amber-100 text-amber-800",
-  HIGH: "bg-green-100 text-green-800",
-};
-
-const RECOMMENDATION_BORDER: Record<Scorecard["recommendation"], string> = {
-  WATCH: "border-l-blue-500",
-  RESEARCH_FURTHER: "border-l-purple-500",
-  PASS: "border-l-gray-400",
-};
-
-const DATA_QUALITY_STYLES: Record<Scorecard["dataQuality"], string> = {
-  THIN: "bg-red-50 text-red-700",
-  ADEQUATE: "bg-slate-100 text-slate-700",
-  RICH: "bg-slate-100 text-slate-700",
-};
-
-const RISK_LEVEL_STYLES: Record<Scorecard["riskLevel"], string> = {
-  LOW: "bg-green-100 text-green-800",
-  MEDIUM: "bg-amber-100 text-amber-800",
-  HIGH: "bg-red-100 text-red-800",
-};
-
-const VALUATION_VERDICT_STYLES: Record<Scorecard["valuationVerdict"], string> = {
-  UNDERVALUED: "bg-green-100 text-green-800",
-  OVERVALUED: "bg-red-100 text-red-800",
-  FAIRLY_VALUED: "bg-blue-100 text-blue-800",
-  INSUFFICIENT_DATA: "bg-gray-200 text-gray-800",
-};
-
-function scoreStyles(score: number | null): string {
-  if (score === null) return "bg-gray-200 text-gray-700";
-  if (score >= 65) return "bg-green-100 text-green-800";
-  if (score >= 35) return "bg-amber-100 text-amber-800";
-  return "bg-red-100 text-red-800";
-}
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
-
-function formatPrice(value: number | null) {
-  return value === null ? "insufficient data" : `$${value.toFixed(2)}`;
-}
+import {
+  CONFIDENCE_STYLES,
+  RECOMMENDATION_BORDER,
+  DATA_QUALITY_STYLES,
+  RISK_LEVEL_STYLES,
+  VALUATION_VERDICT_STYLES,
+  scoreStyles,
+  formatDate,
+  formatPrice,
+} from "@/lib/ui";
 
 export function ScorecardCard({ scorecard }: { scorecard: Scorecard }) {
   return (

@@ -1,9 +1,11 @@
 // Deterministic recommendation scoring — NOT LLM-generated. Combines the
-// valuation gap (from valuation.ts), risk level, and confidence (both from
-// the Synthesizer, confidence capped by dataQuality) into a single 0-100
-// score, and derives the categorical recommendation from that score rather
-// than letting the LLM pick a label independently — the label can never
+// valuation gap (gap.ts), risk level, and confidence (both from the
+// Synthesizer, confidence capped by dataQuality) into a single 0-100 score,
+// and derives the categorical recommendation from that score rather than
+// letting the LLM pick a label independently — the label can never
 // contradict the number this way.
+import { computeValuationGapPct } from "./gap";
+
 export type RiskLevel = "low" | "medium" | "high";
 export type ConfidenceRead = "low" | "medium" | "high";
 export type RecommendationBucket = "watch" | "research_further" | "pass";
@@ -15,15 +17,21 @@ const CONFIDENCE_MULTIPLIER: Record<ConfidenceRead, number> = { high: 1, medium:
 // scaling further — a 200% gap isn't 4x more meaningful than a 50% one.
 const GAP_SATURATION = 0.5;
 
+// The two thresholds that turn a score into a recommendation bucket.
+// Exported so the UI (filter presets, score-pill coloring) reuses these
+// instead of retyping 65/35 elsewhere.
+export const WATCH_THRESHOLD = 65;
+export const RESEARCH_FURTHER_THRESHOLD = 35;
+
 export function computeRecommendationScore(
   currentPrice: number | null,
   fairValueEstimate: number | null,
   riskLevel: RiskLevel,
   confidenceRead: ConfidenceRead
 ): number | null {
-  if (currentPrice === null || fairValueEstimate === null || currentPrice <= 0) return null;
+  const gapPct = computeValuationGapPct(currentPrice, fairValueEstimate);
+  if (gapPct === null) return null;
 
-  const gapPct = (fairValueEstimate - currentPrice) / currentPrice;
   const clampedGap = Math.max(-GAP_SATURATION, Math.min(GAP_SATURATION, gapPct));
   const baseScore = 50 + (clampedGap / GAP_SATURATION) * 50;
 
@@ -35,8 +43,8 @@ export function computeRecommendationScore(
 
 export function deriveRecommendation(score: number | null): RecommendationBucket {
   if (score === null) return "research_further";
-  if (score >= 65) return "watch";
-  if (score >= 35) return "research_further";
+  if (score >= WATCH_THRESHOLD) return "watch";
+  if (score >= RESEARCH_FURTHER_THRESHOLD) return "research_further";
   return "pass";
 }
 

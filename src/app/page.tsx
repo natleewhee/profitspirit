@@ -2,17 +2,18 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Candidate } from "@/lib/types";
+import { CandidateWithLatest } from "@/lib/types";
 import { Status } from "@prisma/client";
 import { CandidateTable } from "@/components/CandidateTable";
 import { FilterBar } from "@/components/FilterBar";
 import { STATUS_OPTIONS, STATUS_LABELS } from "@/lib/labels";
 
 export default function DashboardPage() {
-  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [candidates, setCandidates] = useState<CandidateWithLatest[]>([]);
   const [loading, setLoading] = useState(true);
   const [theme, setTheme] = useState("ALL");
   const [status, setStatus] = useState("ALL");
+  const [runningIds, setRunningIds] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -64,6 +65,27 @@ export default function DashboardPage() {
     if (!confirm("Remove this candidate?")) return;
     setCandidates((prev) => prev.filter((c) => c.id !== id));
     await fetch(`/api/candidates/${id}`, { method: "DELETE" });
+  }
+
+  async function handleRunResearch(id: string) {
+    setRunningIds((prev) => new Set(prev).add(id));
+    try {
+      const res = await fetch(`/api/candidates/${id}/research`, { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error ?? "Research run failed — check server logs.");
+        return;
+      }
+      // Simplest correct option: refetch the list rather than reconstruct
+      // the nested scorecard shape client-side.
+      await load();
+    } finally {
+      setRunningIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
   }
 
   return (
@@ -118,8 +140,10 @@ export default function DashboardPage() {
           <CandidateTable
             candidates={candidates}
             latestDate={latestDate}
+            runningIds={runningIds}
             onStatusChange={handleStatusChange}
             onDelete={handleDelete}
+            onRunResearch={handleRunResearch}
           />
         )}
       </div>

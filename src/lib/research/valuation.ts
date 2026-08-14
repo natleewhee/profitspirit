@@ -7,6 +7,7 @@
 // authority — same "show your work" rule as the rest of this pipeline.
 import type { FundamentalsBundle } from "./fundamentalsData";
 import type { MarketDataBundle } from "./marketData";
+import { computeValuationGapPct } from "./gap";
 
 export type ValuationVerdict = "undervalued" | "overvalued" | "fairly_valued" | "insufficient_data";
 
@@ -100,8 +101,8 @@ export function computeValuation(
 }
 
 function computeVerdict(currentPrice: number | null, fairValue: number | null): ValuationVerdict {
-  if (currentPrice === null || fairValue === null || currentPrice <= 0) return "insufficient_data";
-  const gap = (fairValue - currentPrice) / currentPrice;
+  const gap = computeValuationGapPct(currentPrice, fairValue);
+  if (gap === null) return "insufficient_data";
   if (gap > FAIRLY_VALUED_BAND) return "undervalued";
   if (gap < -FAIRLY_VALUED_BAND) return "overvalued";
   return "fairly_valued";

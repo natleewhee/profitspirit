@@ -45,3 +45,31 @@ export type Scorecard = {
 };
 
 export type CandidateWithScorecards = Candidate & { scorecards: Scorecard[] };
+
+// The narrow projection returned by GET /api/candidates for the dashboard
+// list — excludes the four long prose fields (fundamentalsSummary,
+// technicalsSummary, bullCase, bearCase), which don't belong in a list
+// payload. See docs/dashboard-ux-review.md §2.1.
+export type ScorecardSummary = Pick<
+  Scorecard,
+  | "id"
+  | "asOf"
+  | "createdAt"
+  | "recommendationScore"
+  | "recommendation"
+  | "valuationVerdict"
+  | "fairValueEstimate"
+  | "currentPrice"
+  | "entryPriceEstimate"
+  | "riskLevel"
+  | "confidenceRead"
+  | "dataQuality"
+  | "sector"
+>;
+
+// Latest-two scorecards (for the delta chip) plus a total count, attached
+// to each candidate in the dashboard list.
+export type CandidateWithLatest = Candidate & {
+  scorecards: ScorecardSummary[];
+  scorecardCount: number;
+};
