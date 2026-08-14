@@ -1,4 +1,12 @@
-import { Theme, Status, ConfidenceRead, Recommendation, DataQuality } from "@prisma/client";
+import {
+  Theme,
+  Status,
+  ConfidenceRead,
+  Recommendation,
+  DataQuality,
+  RiskLevel,
+  ValuationVerdict,
+} from "@prisma/client";
 
 export type Candidate = {
   id: string;
@@ -30,6 +38,9 @@ export type Scorecard = {
   sector: string | null;
   industry: string | null;
   dataQuality: DataQuality;
+  riskLevel: RiskLevel;
+  valuationVerdict: ValuationVerdict;
+  recommendationScore: number | null;
   createdAt: string;
 };
 

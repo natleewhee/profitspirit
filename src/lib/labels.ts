@@ -1,4 +1,12 @@
-import { Theme, Status, ConfidenceRead, Recommendation, DataQuality } from "@prisma/client";
+import {
+  Theme,
+  Status,
+  ConfidenceRead,
+  Recommendation,
+  DataQuality,
+  RiskLevel,
+  ValuationVerdict,
+} from "@prisma/client";
 
 export const THEME_LABELS: Record<Theme, string> = {
   AI_INFRA_SEMIS: "AI Infra / Semis",
@@ -34,4 +42,17 @@ export const DATA_QUALITY_LABELS: Record<DataQuality, string> = {
   THIN: "Thin data",
   ADEQUATE: "Adequate data",
   RICH: "Rich data",
+};
+
+export const RISK_LEVEL_LABELS: Record<RiskLevel, string> = {
+  LOW: "Low risk",
+  MEDIUM: "Medium risk",
+  HIGH: "High risk",
+};
+
+export const VALUATION_VERDICT_LABELS: Record<ValuationVerdict, string> = {
+  UNDERVALUED: "Undervalued",
+  OVERVALUED: "Overvalued",
+  FAIRLY_VALUED: "Fairly valued",
+  INSUFFICIENT_DATA: "Insufficient data",
 };

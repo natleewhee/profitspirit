@@ -2,14 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { fetchFundamentalsData } from "@/lib/research/fundamentalsData";
 import { fetchMarketData } from "@/lib/research/marketData";
-import {
-  runFundamentalsAnalyst,
-  runTechnicalsAnalyst,
-  runSynthesizer,
-} from "@/lib/research/agents";
+import { runFundamentalsAnalyst, runTechnicalsAnalyst, runSynthesizer } from "@/lib/research/agents";
 import type { Scorecard as AgentScorecard } from "@/lib/research/scorecard";
 import { buildScorecardExtras } from "@/lib/research/enrich";
 import type { DataQuality as AgentDataQuality } from "@/lib/research/enrich";
+import { computeValuation, type ValuationVerdict as AgentValuationVerdict } from "@/lib/research/valuation";
+import {
+  computeRecommendationScore,
+  deriveRecommendation,
+  capConfidenceByDataQuality,
+  type RecommendationBucket,
+} from "@/lib/research/score";
 
 // Three sequential model calls plus two data fetches can take well past
 // Vercel's default 10s function timeout — give this route real headroom.
@@ -21,13 +24,26 @@ const CONFIDENCE_MAP: Record<AgentScorecard["confidenceRead"], "LOW" | "MEDIUM" 
   high: "HIGH",
 };
 
-const RECOMMENDATION_MAP: Record<
-  AgentScorecard["recommendation"],
-  "WATCH" | "RESEARCH_FURTHER" | "PASS"
-> = {
+const RISK_LEVEL_MAP: Record<AgentScorecard["riskLevel"], "LOW" | "MEDIUM" | "HIGH"> = {
+  low: "LOW",
+  medium: "MEDIUM",
+  high: "HIGH",
+};
+
+const RECOMMENDATION_MAP: Record<RecommendationBucket, "WATCH" | "RESEARCH_FURTHER" | "PASS"> = {
   watch: "WATCH",
-  "research further": "RESEARCH_FURTHER",
+  research_further: "RESEARCH_FURTHER",
   pass: "PASS",
+};
+
+const VALUATION_VERDICT_MAP: Record<
+  AgentValuationVerdict,
+  "UNDERVALUED" | "OVERVALUED" | "FAIRLY_VALUED" | "INSUFFICIENT_DATA"
+> = {
+  undervalued: "UNDERVALUED",
+  overvalued: "OVERVALUED",
+  fairly_valued: "FAIRLY_VALUED",
+  insufficient_data: "INSUFFICIENT_DATA",
 };
 
 const DATA_QUALITY_MAP: Record<AgentDataQuality, "THIN" | "ADEQUATE" | "RICH"> = {
@@ -61,9 +77,24 @@ export async function POST(
     ticker: candidate.ticker,
     fundamentalsSummary,
     technicalsSummary,
+    riskSignals: {
+      debtToEquity: fundamentals.found ? fundamentals.keyRatios.debtToEquity : null,
+      currentRatio: fundamentals.found ? fundamentals.keyRatios.currentRatio : null,
+      fiftyTwoWeekHigh: market.found ? market.fiftyTwoWeekHigh : null,
+      fiftyTwoWeekLow: market.found ? market.fiftyTwoWeekLow : null,
+    },
   });
 
   const extras = buildScorecardExtras(fundamentals, market);
+  const valuation = computeValuation(fundamentals, market);
+  const cappedConfidence = capConfidenceByDataQuality(agentScorecard.confidenceRead, extras.dataQuality);
+  const recommendationScore = computeRecommendationScore(
+    extras.currentPrice,
+    valuation.fairValueEstimate,
+    agentScorecard.riskLevel,
+    cappedConfidence
+  );
+  const recommendation = deriveRecommendation(recommendationScore);
 
   const scorecard = await prisma.scorecard.create({
     data: {
@@ -73,12 +104,15 @@ export async function POST(
       technicalsSummary: agentScorecard.technicalsSummary,
       bullCase: agentScorecard.bullCase,
       bearCase: agentScorecard.bearCase,
-      confidenceRead: CONFIDENCE_MAP[agentScorecard.confidenceRead],
+      confidenceRead: CONFIDENCE_MAP[cappedConfidence],
       riskFlags: agentScorecard.riskFlags,
-      recommendation: RECOMMENDATION_MAP[agentScorecard.recommendation],
-      entryPriceEstimate: agentScorecard.entryPriceEstimate,
-      fairValueEstimate: agentScorecard.fairValueEstimate,
-      targetsBasis: agentScorecard.targetsBasis,
+      riskLevel: RISK_LEVEL_MAP[agentScorecard.riskLevel],
+      recommendation: RECOMMENDATION_MAP[recommendation],
+      recommendationScore,
+      entryPriceEstimate: valuation.entryPriceEstimate,
+      fairValueEstimate: valuation.fairValueEstimate,
+      valuationVerdict: VALUATION_VERDICT_MAP[valuation.valuationVerdict],
+      targetsBasis: valuation.targetsBasis,
       currentPrice: extras.currentPrice,
       sector: extras.sector,
       industry: extras.industry,

@@ -36,6 +36,13 @@ export type FundamentalsBundle = {
     totalCash: number | null;
     totalDebt: number | null;
   };
+  // Raw inputs for the deterministic valuation engine (src/lib/research/valuation.ts)
+  // — kept separate from keyRatios since these feed a formula, not the LLM prompt.
+  valuationInputs: {
+    trailingEps: number | null;
+    bookValuePerShare: number | null;
+    sharesOutstanding: number | null;
+  };
   annualIncomeStatements: IncomeStatementPeriod[];
   quarterlyIncomeStatements: IncomeStatementPeriod[];
 } | {
@@ -79,7 +86,7 @@ export async function fetchFundamentalsData(ticker: string): Promise<Fundamental
   try {
     const [summary, annualIncomeStatements, quarterlyIncomeStatements] = await Promise.all([
       yahooFinance.quoteSummary(ticker, {
-        modules: ["price", "assetProfile", "financialData"],
+        modules: ["price", "assetProfile", "financialData", "defaultKeyStatistics"],
       }),
       fetchIncomeStatements(ticker, "annual"),
       fetchIncomeStatements(ticker, "quarterly"),
@@ -106,6 +113,11 @@ export async function fetchFundamentalsData(ticker: string): Promise<Fundamental
         freeCashflow: summary.financialData?.freeCashflow ?? null,
         totalCash: summary.financialData?.totalCash ?? null,
         totalDebt: summary.financialData?.totalDebt ?? null,
+      },
+      valuationInputs: {
+        trailingEps: summary.defaultKeyStatistics?.trailingEps ?? null,
+        bookValuePerShare: summary.defaultKeyStatistics?.bookValue ?? null,
+        sharesOutstanding: summary.defaultKeyStatistics?.sharesOutstanding ?? null,
       },
       annualIncomeStatements,
       quarterlyIncomeStatements,

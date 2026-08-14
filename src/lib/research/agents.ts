@@ -24,18 +24,17 @@ const SCORECARD_JSON_SCHEMA = {
     technicalsSummary: { type: "string" },
     bullCase: { type: "string" },
     bearCase: { type: "string" },
-    confidenceRead: { type: "string", enum: ["low", "medium", "high"] },
     riskFlags: { type: "array", items: { type: "string" } },
-    recommendation: { type: "string", enum: ["watch", "research further", "pass"] },
-    entryPriceEstimate: {
-      type: ["number", "null"],
-      description: "Grounded in the technicals data; null if not enough was surfaced to ground one",
+    riskLevel: {
+      type: "string",
+      enum: ["low", "medium", "high"],
+      description: "Overall risk level given the fundamentals, technicals, and bear case",
     },
-    fairValueEstimate: {
-      type: ["number", "null"],
-      description: "Grounded in fundamentals + technicals; null if not enough was surfaced to ground one",
+    confidenceRead: {
+      type: "string",
+      enum: ["low", "medium", "high"],
+      description: "Confidence in the risk level and overall read above, given how much the data supports it",
     },
-    targetsBasis: { type: "string", description: "One line: what the two estimates above are derived from" },
   },
   required: [
     "ticker",
@@ -44,12 +43,9 @@ const SCORECARD_JSON_SCHEMA = {
     "technicalsSummary",
     "bullCase",
     "bearCase",
-    "confidenceRead",
     "riskFlags",
-    "recommendation",
-    "entryPriceEstimate",
-    "fairValueEstimate",
-    "targetsBasis",
+    "riskLevel",
+    "confidenceRead",
   ],
 };
 
@@ -125,16 +121,25 @@ export async function runTechnicalsAnalyst(market: MarketDataBundle): Promise<st
   );
 }
 
-// 3.3 Synthesizer / Debate Agent — reads both analysts' output. Deliberately
-// does not see the original trigger reason: that's a free-text field a human
-// typed when logging the candidate (often a placeholder, per candidate.notes
-// in practice) and shouldn't bias research that's meant to stand on the
-// data alone. Produces bull/bear case + structured scorecard. Never fills
-// gaps the analysts didn't surface.
+// 3.3 Synthesizer / Debate Agent — reads both analysts' output plus a
+// handful of explicit risk signals (debt/liquidity ratios, price volatility)
+// so riskLevel is grounded in numbers, not vibes. Deliberately does not see
+// the original trigger reason: that's a free-text field a human typed when
+// logging the candidate (often a placeholder) and shouldn't bias research
+// that's meant to stand on the data alone. No longer produces price targets
+// or a recommendation — those are computed deterministically from data we
+// already have (see valuation.ts, score.ts) rather than guessed from prose.
+// Never fills gaps the analysts didn't surface.
 export async function runSynthesizer(params: {
   ticker: string;
   fundamentalsSummary: string;
   technicalsSummary: string;
+  riskSignals: {
+    debtToEquity: number | null;
+    currentRatio: number | null;
+    fiftyTwoWeekHigh: number | null;
+    fiftyTwoWeekLow: number | null;
+  };
 }): Promise<Scorecard> {
   const asOf = new Date().toISOString().slice(0, 10);
 
@@ -151,25 +156,22 @@ export async function runSynthesizer(params: {
         role: "system",
         content:
           "You are the synthesizer in a small research pipeline. You read the " +
-          "Fundamentals Analyst's summary and the Technicals Analyst's summary. " +
-          "Produce a short bull case, a short bear case, an explicit confidence " +
-          "read (how much the two analysts' data actually supports a clear " +
-          "view), risk flags, and a recommendation of watch / research further " +
-          "/ pass. " +
+          "Fundamentals Analyst's summary, the Technicals Analyst's summary, " +
+          "and a few raw risk signals (debt-to-equity, current ratio, 52-week " +
+          "range). Produce a short bull case, a short bear case, risk flags, " +
+          "an overall riskLevel (low/medium/high — weigh the debt and liquidity " +
+          "ratios given, plus anything the bear case surfaces), and a " +
+          "confidenceRead for how much the data actually supports your risk " +
+          "level and overall read. " +
           "You do not invent data: if the two analysts didn't surface something, " +
-          "you don't either — no filling gaps with plausible-sounding guesses. " +
-          "entryPriceEstimate and fairValueEstimate must be derived only from " +
-          "numbers that actually appear in the two summaries (e.g. last close, " +
-          "52-week range, valuation ratios) — if there isn't enough to ground an " +
-          "estimate, return null for it rather than guessing, and say why in " +
-          "targetsBasis.\n\n" +
+          "you don't either — no filling gaps with plausible-sounding guesses.\n\n" +
           "Respond with ONLY a single JSON object, no markdown fences, no other " +
           "text, matching exactly this shape:\n" +
           JSON.stringify(SCORECARD_JSON_SCHEMA, null, 2),
       },
       {
         role: "user",
-        content: `Ticker: ${params.ticker}\n\nFundamentals Analyst summary:\n${params.fundamentalsSummary}\n\nTechnicals Analyst summary:\n${params.technicalsSummary}\n\nasOf date to use: ${asOf}`,
+        content: `Ticker: ${params.ticker}\n\nFundamentals Analyst summary:\n${params.fundamentalsSummary}\n\nTechnicals Analyst summary:\n${params.technicalsSummary}\n\nRaw risk signals:\n${JSON.stringify(params.riskSignals, null, 2)}\n\nasOf date to use: ${asOf}`,
       },
     ],
   });

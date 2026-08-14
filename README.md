@@ -84,11 +84,17 @@ commit) for it to take effect.
 ## Research agent
 
 See `docs/research-agent-scope.md` for the full scope, phases, and
-boundaries. The pipeline itself (`src/lib/research/`) is three LLM agents —
-Fundamentals and Technicals both read Yahoo Finance (via `yahoo-finance2`),
-and a Synthesizer produces the scorecard — shared between two entry points.
-Model calls run on **Groq's free tier** (no cost) rather than a paid API,
-using `llama-3.3-70b-versatile`.
+boundaries (§5a covers the scoring architecture in detail). The pipeline
+(`src/lib/research/`) is three LLM agents — Fundamentals and Technicals
+both read Yahoo Finance (via `yahoo-finance2`), and a Synthesizer writes
+the bull/bear case, risk flags, risk level, and confidence — plus two
+deterministic (non-LLM) layers: `valuation.ts` computes entry price and
+intrinsic value from real formulas (Graham Number + FCF yield, averaged),
+and `score.ts` combines that with risk/confidence into a 0–100
+recommendation score, with the watch/research-further/pass label derived
+from the score rather than guessed independently. Model calls run on
+**Groq's free tier** (no cost) rather than a paid API, using
+`llama-3.3-70b-versatile`.
 
 **Why Yahoo Finance for both, not SEC EDGAR:** the original plan used SEC
 EDGAR for fundamentals (official source, no key), but EDGAR returned 403s
