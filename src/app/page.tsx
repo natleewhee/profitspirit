@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { CandidateWithLatest } from "@/lib/types";
+import { CandidateWithLatest, LiveQuote } from "@/lib/types";
 import { Status, ValuationVerdict } from "@prisma/client";
 import { CandidateTable } from "@/components/CandidateTable";
 import { FilterBar, DEFAULT_FILTERS, Filters } from "@/components/FilterBar";
@@ -49,6 +49,7 @@ function DashboardContent() {
   const [candidates, setCandidates] = useState<CandidateWithLatest[]>([]);
   const [loading, setLoading] = useState(true);
   const [runningIds, setRunningIds] = useState<Set<string>>(new Set());
+  const [liveQuotes, setLiveQuotes] = useState<Record<string, LiveQuote>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -61,6 +62,33 @@ function DashboardContent() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Live prices are display-only (see api/quotes/route.ts) — fetched once
+  // the ticker list is known, then refreshed on an interval while the tab is
+  // open. Never touches the frozen research-time price used for the gap.
+  const tickerKey = useMemo(
+    () => Array.from(new Set(candidates.map((c) => c.ticker))).sort().join(","),
+    [candidates]
+  );
+
+  useEffect(() => {
+    if (!tickerKey) return;
+
+    let cancelled = false;
+    async function fetchQuotes() {
+      const res = await fetch(`/api/quotes?tickers=${encodeURIComponent(tickerKey)}`);
+      if (!res.ok || cancelled) return;
+      const data = await res.json();
+      if (!cancelled) setLiveQuotes(data);
+    }
+
+    fetchQuotes();
+    const interval = setInterval(fetchQuotes, 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [tickerKey]);
 
   function updateUrl(patch: Partial<Filters>, extra: Record<string, string | null> = {}) {
     const nextFilters = { ...filters, ...patch };
@@ -275,6 +303,7 @@ function DashboardContent() {
             candidates={filtered}
             latestDate={latestDate}
             runningIds={runningIds}
+            liveQuotes={liveQuotes}
             onStatusChange={handleStatusChange}
             onDelete={handleDelete}
             onRunResearch={handleRunResearch}

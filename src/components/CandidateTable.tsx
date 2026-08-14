@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { CandidateWithLatest } from "@/lib/types";
+import { CandidateWithLatest, LiveQuote } from "@/lib/types";
 import { Status, ConfidenceRead } from "@prisma/client";
 import {
   STATUS_OPTIONS,
@@ -32,10 +32,42 @@ type Props = {
   candidates: CandidateWithLatest[];
   latestDate: string | null;
   runningIds: Set<string>;
+  liveQuotes: Record<string, LiveQuote>;
   onStatusChange: (id: string, status: Status) => void;
   onDelete: (id: string) => void;
   onRunResearch: (id: string) => void;
 };
+
+function LivePriceChip({ quote }: { quote: LiveQuote | undefined }) {
+  if (!quote || quote.regularMarketPrice === null) return null;
+
+  const up = (quote.regularMarketChangePercent ?? 0) >= 0;
+  const changeColor = up ? "text-green-700" : "text-red-700";
+
+  return (
+    <div className="mt-0.5">
+      <span className="text-gray-900">{formatPrice(quote.regularMarketPrice)}</span>{" "}
+      {quote.regularMarketChangePercent !== null && (
+        <span className={`text-xs font-medium ${changeColor}`}>
+          {up ? "+" : ""}
+          {quote.regularMarketChangePercent.toFixed(2)}%
+        </span>
+      )}
+      {quote.prePostLabel && quote.prePostPrice !== null && (
+        <div className="text-xs text-gray-500">
+          {quote.prePostLabel}: {formatPrice(quote.prePostPrice)}
+          {quote.prePostChangePercent !== null && (
+            <span className={quote.prePostChangePercent >= 0 ? "text-green-700" : "text-red-700"}>
+              {" "}
+              {quote.prePostChangePercent >= 0 ? "+" : ""}
+              {quote.prePostChangePercent.toFixed(2)}%
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, {
@@ -78,6 +110,7 @@ export function CandidateTable({
   candidates,
   latestDate,
   runningIds,
+  liveQuotes,
   onStatusChange,
   onDelete,
   onRunResearch,
@@ -144,7 +177,10 @@ export function CandidateTable({
             <Th onClick={() => toggleSort("score")}>Score</Th>
             <th className="px-4 py-2 text-left font-medium text-gray-600">Call</th>
             <Th onClick={() => toggleSort("gap")}>Valuation</Th>
-            <th className="px-4 py-2 text-left font-medium text-gray-600">Price</th>
+            <th className="px-4 py-2 text-left font-medium text-gray-600">
+              Price
+              <div className="text-[10px] font-normal normal-case text-gray-400">live / at research</div>
+            </th>
             <th className="px-4 py-2 text-left font-medium text-gray-600">Risk</th>
             <Th onClick={() => toggleSort("researched")}>Researched</Th>
             <th className="px-4 py-2 text-left font-medium text-gray-600">Status</th>
@@ -225,7 +261,10 @@ export function CandidateTable({
                       </div>
                     </td>
                     <td className="whitespace-nowrap px-4 py-2">
-                      <div className="text-gray-900">{formatPrice(latest.currentPrice)}</div>
+                      <LivePriceChip quote={liveQuotes[c.ticker]} />
+                      <div className="text-xs text-gray-500">
+                        {formatPrice(latest.currentPrice)} at research
+                      </div>
                       {latest.entryPriceEstimate !== null && (
                         <div className="text-xs text-gray-500">
                           → {formatPrice(latest.entryPriceEstimate)} entry

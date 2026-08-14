@@ -73,3 +73,15 @@ export type CandidateWithLatest = Candidate & {
   scorecards: ScorecardSummary[];
   scorecardCount: number;
 };
+
+// Mirrors LiveQuote from src/app/api/quotes/route.ts — kept as a plain type
+// here (not imported) since that file is a server route module.
+export type LiveQuote = {
+  ticker: string;
+  regularMarketPrice: number | null;
+  regularMarketChangePercent: number | null;
+  marketState: string | null;
+  prePostPrice: number | null;
+  prePostChangePercent: number | null;
+  prePostLabel: "Pre-market" | "After hours" | null;
+};

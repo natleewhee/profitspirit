@@ -42,6 +42,10 @@ export type FundamentalsBundle = {
     trailingEps: number | null;
     bookValuePerShare: number | null;
     sharesOutstanding: number | null;
+    // Forward EPS growth estimate (Yahoo's `earningsGrowth`) — feeds the
+    // growth term in Graham's revised valuation formula. Analyst-estimate
+    // based, not guaranteed, hence still just one input among several.
+    earningsGrowth: number | null;
   };
   annualIncomeStatements: IncomeStatementPeriod[];
   quarterlyIncomeStatements: IncomeStatementPeriod[];
@@ -118,6 +122,7 @@ export async function fetchFundamentalsData(ticker: string): Promise<Fundamental
         trailingEps: summary.defaultKeyStatistics?.trailingEps ?? null,
         bookValuePerShare: summary.defaultKeyStatistics?.bookValue ?? null,
         sharesOutstanding: summary.defaultKeyStatistics?.sharesOutstanding ?? null,
+        earningsGrowth: summary.financialData?.earningsGrowth ?? null,
       },
       annualIncomeStatements,
       quarterlyIncomeStatements,
