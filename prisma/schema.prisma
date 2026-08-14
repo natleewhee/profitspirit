@@ -3,8 +3,12 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  // Migrations need a direct (non-pooled) connection — Supabase's pgbouncer
+  // pooler on DATABASE_URL doesn't support the transaction modes `migrate
+  // deploy` requires. The app's runtime queries keep using DATABASE_URL.
+  directUrl = env("DIRECT_URL")
 }
 
 enum Theme {

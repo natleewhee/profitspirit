@@ -33,12 +33,17 @@ on dashboard with no cost and no local machine dependency:
 
 1. **Create a Supabase project** (https://supabase.com, free tier):
    - Sign up / log in, create a new project, set a database password.
-   - Grab the connection string from Project Settings → Database →
-     Connection string. Prefer the **pooled** connection (port 6543,
-     `...pooler.supabase.com`, add `?pgbouncer=true`) over the direct one
-     (port 5432) — Vercel's serverless functions can each open their own
-     connection, and the pooled endpoint avoids hitting Supabase's
-     connection-limit under concurrent load.
+   - Grab **two** connection strings from Project Settings → Database →
+     Connection string:
+     - **Pooled** (port 6543, `...pooler.supabase.com`, add
+       `?pgbouncer=true`) → this is `DATABASE_URL`, used by the app at
+       runtime. Vercel's serverless functions can each open their own
+       connection, and the pooled endpoint avoids hitting Supabase's
+       connection limit under concurrent load.
+     - **Direct** (port 5432, no pgbouncer) → this is `DIRECT_URL`, used
+       only during `prisma migrate deploy` at build time. Migrations need
+       a direct connection — Supabase's pooler doesn't support the
+       transaction modes migrations require.
    - Note: Supabase's free tier pauses a project after 7 days of
      inactivity and requires manually resuming it from the dashboard —
      worth knowing if you go more than a week between visits.
@@ -46,28 +51,38 @@ on dashboard with no cost and no local machine dependency:
 2. **Push this repo to GitHub** (already done if you're reading this from
    the repo) and **import it into Vercel** (https://vercel.com, free tier):
    - "New Project" → import the `profitspirit` repo.
-   - Under Environment Variables, add `DATABASE_URL` with the Supabase
-     connection string from step 1. Make sure it's enabled for the
-     **Production** environment (and Preview/Development if you want those
-     to work too).
+   - Under Environment Variables, add both `DATABASE_URL` and `DIRECT_URL`
+     from step 1. Make sure both are enabled for the **Production**
+     environment (and Preview/Development if you want those to work too).
    - Deploy.
 
-3. **Run the migration against the Supabase database once**, either from
-   your machine:
-   ```
-   DATABASE_URL="<your supabase connection string>" npx prisma migrate deploy
-   ```
-   or, if that environment can't reach the database directly, paste the SQL
-   from `prisma/migrations/*/migration.sql` into Supabase's SQL Editor
-   (Project → SQL Editor → New query) and run it. Re-run for any new
-   migrations added later.
+The build (`prisma generate && prisma migrate deploy && next build`) applies
+any pending migrations automatically on every deploy — no manual SQL step
+needed for new migrations added later. If you're recovering a database that
+already has these tables from before migrations were tracked, baseline it
+first (see below) so `migrate deploy` doesn't try to re-run migrations
+against columns/types that already exist.
 
-4. Visit the URL Vercel gives you — that's your always-viewable dashboard.
+Visit the URL Vercel gives you — that's your always-viewable dashboard.
 
 **Note:** Vercel does not retroactively inject environment variables into
-already-built deployments — after adding or changing `DATABASE_URL`, you
-need to trigger a fresh deploy (Deployments → "..." → Redeploy, or push a
-commit) for it to take effect.
+already-built deployments — after adding or changing `DATABASE_URL` or
+`DIRECT_URL`, you need to trigger a fresh deploy (Deployments → "..." →
+Redeploy, or push a commit) for it to take effect.
+
+### Baselining an existing database
+
+If your Supabase database already has tables (e.g. it predates this
+project's migration history, or migrations were applied by hand via the SQL
+Editor), tell Prisma those migrations are already applied instead of
+re-running them — otherwise `migrate deploy` will fail with "already
+exists" errors on the next deploy:
+
+```
+DATABASE_URL="<direct connection string>" npx prisma migrate resolve --applied <migration_folder_name>
+```
+
+Run once per folder under `prisma/migrations/`, oldest first.
 
 ## Weekly workflow
 
