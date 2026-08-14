@@ -147,6 +147,22 @@ analysts didn't surface enough to ground an estimate, the Synthesizer
 says so instead of guessing. The UI should render "insufficient data" for
 a null target, never a blank or a zero.
 
+**Extended in Phase 2, post-launch (not LLM-generated):** four more fields
+were added to the DB `Scorecard` record after the first real usage —
+`currentPrice`, `sector`, `industry`, and `dataQuality`
+(`thin`/`adequate`/`rich`). None of these come from the Synthesizer; they're
+computed/captured directly from the fetched fundamentals + market data in
+`src/lib/research/enrich.ts`, since we know them for certain and don't need
+a model to guess. `dataQuality` is distinct from `confidenceRead` — it
+reflects how much data the analysts actually had (deterministic, based on
+what was fetched), not the Synthesizer's read on how clear the signal is.
+
+**Also changed:** the Synthesizer no longer receives the candidate's
+`triggerReason` as input. It was a free-text field a human typed when
+logging the candidate — often a placeholder — and research is meant to
+stand on the fetched data alone, not be biased by whatever was typed at
+scan time.
+
 ## 6. Obsidian's role
 
 A companion research notebook, not the system of record. Each ticker run

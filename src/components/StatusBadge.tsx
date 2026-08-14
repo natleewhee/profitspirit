@@ -6,7 +6,7 @@ const STYLES: Record<Status, string> = {
   RESEARCHED: "bg-amber-100 text-amber-800",
   ADDED_TO_WATCHLIST: "bg-purple-100 text-purple-800",
   ADDED_TO_PORTFOLIO: "bg-green-100 text-green-800",
-  PASSED: "bg-gray-100 text-gray-500",
+  PASSED: "bg-gray-200 text-gray-800",
 };
 
 export function StatusBadge({ status }: { status: Status }) {

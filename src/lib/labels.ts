@@ -1,4 +1,4 @@
-import { Theme, Status, ConfidenceRead, Recommendation } from "@prisma/client";
+import { Theme, Status, ConfidenceRead, Recommendation, DataQuality } from "@prisma/client";
 
 export const THEME_LABELS: Record<Theme, string> = {
   AI_INFRA_SEMIS: "AI Infra / Semis",
@@ -28,4 +28,10 @@ export const RECOMMENDATION_LABELS: Record<Recommendation, string> = {
   WATCH: "Watch",
   RESEARCH_FURTHER: "Research further",
   PASS: "Pass",
+};
+
+export const DATA_QUALITY_LABELS: Record<DataQuality, string> = {
+  THIN: "Thin data",
+  ADEQUATE: "Adequate data",
+  RICH: "Rich data",
 };

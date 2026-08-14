@@ -6,6 +6,7 @@ import { Candidate } from "@/lib/types";
 import { Status } from "@prisma/client";
 import { CandidateTable } from "@/components/CandidateTable";
 import { FilterBar } from "@/components/FilterBar";
+import { STATUS_OPTIONS, STATUS_LABELS } from "@/lib/labels";
 
 export default function DashboardPage() {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
@@ -36,6 +37,18 @@ export default function DashboardPage() {
     );
   }, [candidates]);
 
+  const statusCounts = useMemo(() => {
+    const counts: Record<Status, number> = {
+      NEW: 0,
+      RESEARCHED: 0,
+      ADDED_TO_WATCHLIST: 0,
+      ADDED_TO_PORTFOLIO: 0,
+      PASSED: 0,
+    };
+    for (const c of candidates) counts[c.status]++;
+    return counts;
+  }, [candidates]);
+
   async function handleStatusChange(id: string, newStatus: Status) {
     setCandidates((prev) =>
       prev.map((c) => (c.id === id ? { ...c, status: newStatus } : c))
@@ -60,7 +73,7 @@ export default function DashboardPage() {
           <h1 className="text-xl font-semibold text-gray-900">
             Scan Candidates Dashboard
           </h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-sm text-gray-600">
             Weekly Finviz scan output, logged by theme and scan date.
           </p>
         </div>
@@ -72,6 +85,20 @@ export default function DashboardPage() {
         </Link>
       </div>
 
+      {!loading && candidates.length > 0 && (
+        <div className="mt-6 flex flex-wrap gap-3">
+          {STATUS_OPTIONS.map(([value]) => (
+            <div
+              key={value}
+              className="rounded-md border border-gray-200 bg-white px-3 py-2 text-center"
+            >
+              <div className="text-lg font-semibold text-gray-900">{statusCounts[value]}</div>
+              <div className="text-xs text-gray-600">{STATUS_LABELS[value]}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="mt-6 flex items-center justify-between">
         <FilterBar
           theme={theme}
@@ -79,14 +106,14 @@ export default function DashboardPage() {
           onThemeChange={setTheme}
           onStatusChange={setStatus}
         />
-        <span className="text-sm text-gray-400">
+        <span className="text-sm text-gray-600">
           {candidates.length} candidate{candidates.length === 1 ? "" : "s"}
         </span>
       </div>
 
       <div className="mt-4">
         {loading ? (
-          <div className="p-10 text-center text-sm text-gray-400">Loading…</div>
+          <div className="p-10 text-center text-sm text-gray-600">Loading…</div>
         ) : (
           <CandidateTable
             candidates={candidates}

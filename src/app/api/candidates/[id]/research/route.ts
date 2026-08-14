@@ -8,6 +8,8 @@ import {
   runSynthesizer,
 } from "@/lib/research/agents";
 import type { Scorecard as AgentScorecard } from "@/lib/research/scorecard";
+import { buildScorecardExtras } from "@/lib/research/enrich";
+import type { DataQuality as AgentDataQuality } from "@/lib/research/enrich";
 
 // Three sequential model calls plus two data fetches can take well past
 // Vercel's default 10s function timeout — give this route real headroom.
@@ -26,6 +28,12 @@ const RECOMMENDATION_MAP: Record<
   watch: "WATCH",
   "research further": "RESEARCH_FURTHER",
   pass: "PASS",
+};
+
+const DATA_QUALITY_MAP: Record<AgentDataQuality, "THIN" | "ADEQUATE" | "RICH"> = {
+  thin: "THIN",
+  adequate: "ADEQUATE",
+  rich: "RICH",
 };
 
 export async function POST(
@@ -51,10 +59,11 @@ export async function POST(
 
   const agentScorecard = await runSynthesizer({
     ticker: candidate.ticker,
-    triggerReason: candidate.triggerReason,
     fundamentalsSummary,
     technicalsSummary,
   });
+
+  const extras = buildScorecardExtras(fundamentals, market);
 
   const scorecard = await prisma.scorecard.create({
     data: {
@@ -70,6 +79,10 @@ export async function POST(
       entryPriceEstimate: agentScorecard.entryPriceEstimate,
       fairValueEstimate: agentScorecard.fairValueEstimate,
       targetsBasis: agentScorecard.targetsBasis,
+      currentPrice: extras.currentPrice,
+      sector: extras.sector,
+      industry: extras.industry,
+      dataQuality: DATA_QUALITY_MAP[extras.dataQuality],
     },
   });
 

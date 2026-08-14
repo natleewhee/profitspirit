@@ -49,7 +49,7 @@ export function CandidateTable({ candidates, latestDate, onStatusChange, onDelet
 
   if (candidates.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-gray-300 p-10 text-center text-sm text-gray-500">
+      <div className="rounded-lg border border-dashed border-gray-300 p-10 text-center text-sm text-gray-600">
         No candidates match these filters yet.
       </div>
     );
@@ -63,9 +63,9 @@ export function CandidateTable({ candidates, latestDate, onStatusChange, onDelet
             <Th onClick={() => toggleSort("ticker")}>Ticker</Th>
             <Th onClick={() => toggleSort("dateScanned")}>Date Scanned</Th>
             <Th onClick={() => toggleSort("theme")}>Theme</Th>
-            <th className="px-4 py-2 text-left font-medium text-gray-500">Trigger Reason</th>
-            <th className="px-4 py-2 text-left font-medium text-gray-500">Status</th>
-            <th className="px-4 py-2 text-left font-medium text-gray-500">Notes</th>
+            <th className="px-4 py-2 text-left font-medium text-gray-600">Trigger Reason</th>
+            <th className="px-4 py-2 text-left font-medium text-gray-600">Status</th>
+            <th className="px-4 py-2 text-left font-medium text-gray-600">Notes</th>
             <th className="px-4 py-2" />
           </tr>
         </thead>
@@ -105,7 +105,7 @@ export function CandidateTable({ candidates, latestDate, onStatusChange, onDelet
                     <StatusBadge status={c.status} />
                   </div>
                 </td>
-                <td className="max-w-xs truncate px-4 py-2 text-gray-500" title={c.notes ?? ""}>
+                <td className="max-w-xs truncate px-4 py-2 text-gray-600" title={c.notes ?? ""}>
                   {c.notes}
                 </td>
                 <td className="whitespace-nowrap px-4 py-2 text-right">
@@ -120,7 +120,7 @@ export function CandidateTable({ candidates, latestDate, onStatusChange, onDelet
                   </Link>
                   <button
                     onClick={() => onDelete(c.id)}
-                    className="ml-3 text-gray-400 hover:text-red-600"
+                    className="ml-3 text-gray-500 hover:text-red-600"
                   >
                     Delete
                   </button>
@@ -137,7 +137,7 @@ export function CandidateTable({ candidates, latestDate, onStatusChange, onDelet
 function Th({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
   return (
     <th
-      className="cursor-pointer select-none whitespace-nowrap px-4 py-2 text-left font-medium text-gray-500 hover:text-gray-700"
+      className="cursor-pointer select-none whitespace-nowrap px-4 py-2 text-left font-medium text-gray-600 hover:text-gray-900"
       onClick={onClick}
     >
       {children} ↕

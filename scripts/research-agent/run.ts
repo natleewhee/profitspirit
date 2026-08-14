@@ -14,10 +14,11 @@ import {
   runTechnicalsAnalyst,
   runSynthesizer,
 } from "../../src/lib/research/agents";
+import { buildScorecardExtras } from "../../src/lib/research/enrich";
 
 const OUTPUT_DIR = path.join(process.cwd(), "docs", "research-runs");
 
-async function runOne(ticker: string, triggerReason: string) {
+async function runOne(ticker: string) {
   console.log(`\n=== ${ticker} ===`);
 
   console.log("Fetching fundamentals data...");
@@ -37,17 +38,18 @@ async function runOne(ticker: string, triggerReason: string) {
   console.log("Running Synthesizer...");
   const scorecard = await runSynthesizer({
     ticker,
-    triggerReason,
     fundamentalsSummary,
     technicalsSummary,
   });
 
+  const enriched = { ...scorecard, ...buildScorecardExtras(fundamentals, market) };
+
   console.log(`\n--- Scorecard: ${ticker} ---`);
-  console.log(JSON.stringify(scorecard, null, 2));
+  console.log(JSON.stringify(enriched, null, 2));
 
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
   const outPath = path.join(OUTPUT_DIR, `${ticker}-${scorecard.asOf}.json`);
-  fs.writeFileSync(outPath, JSON.stringify(scorecard, null, 2));
+  fs.writeFileSync(outPath, JSON.stringify(enriched, null, 2));
   console.log(`Saved to ${path.relative(process.cwd(), outPath)}`);
 }
 
@@ -68,7 +70,7 @@ async function main() {
 
   for (const ticker of tickers) {
     try {
-      await runOne(ticker.toUpperCase(), "Manually triggered Phase 1 test run — no scan log entry.");
+      await runOne(ticker.toUpperCase());
     } catch (err) {
       console.error(`\n--- ${ticker} failed ---`);
       console.error((err as Error).message);

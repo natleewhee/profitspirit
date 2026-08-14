@@ -1,4 +1,4 @@
-import { Theme, Status, ConfidenceRead, Recommendation } from "@prisma/client";
+import { Theme, Status, ConfidenceRead, Recommendation, DataQuality } from "@prisma/client";
 
 export type Candidate = {
   id: string;
@@ -26,6 +26,10 @@ export type Scorecard = {
   entryPriceEstimate: number | null;
   fairValueEstimate: number | null;
   targetsBasis: string;
+  currentPrice: number | null;
+  sector: string | null;
+  industry: string | null;
+  dataQuality: DataQuality;
   createdAt: string;
 };
 
