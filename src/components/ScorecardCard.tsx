@@ -1,8 +1,8 @@
 import { Scorecard } from "@/lib/types";
-import { CONFIDENCE_LABELS, RECOMMENDATION_LABELS } from "@/lib/labels";
+import { CONFIDENCE_LABELS, RECOMMENDATION_LABELS, DATA_QUALITY_LABELS } from "@/lib/labels";
 
 const CONFIDENCE_STYLES: Record<Scorecard["confidenceRead"], string> = {
-  LOW: "bg-gray-100 text-gray-600",
+  LOW: "bg-gray-200 text-gray-800",
   MEDIUM: "bg-amber-100 text-amber-800",
   HIGH: "bg-green-100 text-green-800",
 };
@@ -10,7 +10,19 @@ const CONFIDENCE_STYLES: Record<Scorecard["confidenceRead"], string> = {
 const RECOMMENDATION_STYLES: Record<Scorecard["recommendation"], string> = {
   WATCH: "bg-blue-100 text-blue-800",
   RESEARCH_FURTHER: "bg-purple-100 text-purple-800",
-  PASS: "bg-gray-100 text-gray-500",
+  PASS: "bg-gray-200 text-gray-800",
+};
+
+const RECOMMENDATION_BORDER: Record<Scorecard["recommendation"], string> = {
+  WATCH: "border-l-blue-500",
+  RESEARCH_FURTHER: "border-l-purple-500",
+  PASS: "border-l-gray-400",
+};
+
+const DATA_QUALITY_STYLES: Record<Scorecard["dataQuality"], string> = {
+  THIN: "bg-red-50 text-red-700",
+  ADEQUATE: "bg-slate-100 text-slate-700",
+  RICH: "bg-slate-100 text-slate-700",
 };
 
 function formatDate(iso: string) {
@@ -27,9 +39,26 @@ function formatPrice(value: number | null) {
 
 export function ScorecardCard({ scorecard }: { scorecard: Scorecard }) {
   return (
-    <div className="rounded-lg border border-gray-200 p-4">
+    <div
+      className={`rounded-lg border border-gray-200 border-l-4 p-4 ${RECOMMENDATION_BORDER[scorecard.recommendation]}`}
+    >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-xs text-gray-400">As of {formatDate(scorecard.asOf)}</span>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-600">
+          <span>As of {formatDate(scorecard.asOf)}</span>
+          {scorecard.currentPrice !== null && (
+            <span>Price at research: {formatPrice(scorecard.currentPrice)}</span>
+          )}
+          {(scorecard.sector || scorecard.industry) && (
+            <span>
+              {[scorecard.sector, scorecard.industry].filter(Boolean).join(" / ")}
+            </span>
+          )}
+          <span
+            className={`rounded-full px-2 py-0.5 font-medium ${DATA_QUALITY_STYLES[scorecard.dataQuality]}`}
+          >
+            {DATA_QUALITY_LABELS[scorecard.dataQuality]}
+          </span>
+        </div>
         <div className="flex gap-2">
           <span
             className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${RECOMMENDATION_STYLES[scorecard.recommendation]}`}
@@ -46,7 +75,7 @@ export function ScorecardCard({ scorecard }: { scorecard: Scorecard }) {
 
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <div>
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-600">
             Fundamentals
           </h4>
           <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700">
@@ -54,7 +83,7 @@ export function ScorecardCard({ scorecard }: { scorecard: Scorecard }) {
           </p>
         </div>
         <div>
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-600">
             Technicals
           </h4>
           <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700">
@@ -77,7 +106,7 @@ export function ScorecardCard({ scorecard }: { scorecard: Scorecard }) {
 
       {scorecard.riskFlags.length > 0 && (
         <div className="mt-3">
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-600">
             Risk flags
           </h4>
           <ul className="mt-1 list-inside list-disc text-sm text-gray-700">
@@ -88,17 +117,23 @@ export function ScorecardCard({ scorecard }: { scorecard: Scorecard }) {
         </div>
       )}
 
-      <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 border-t border-gray-100 pt-3 text-sm">
-        <span>
-          <span className="text-gray-500">Entry estimate: </span>
-          {formatPrice(scorecard.entryPriceEstimate)}
-        </span>
-        <span>
-          <span className="text-gray-500">Fair value estimate: </span>
-          {formatPrice(scorecard.fairValueEstimate)}
-        </span>
+      <div className="mt-3 rounded-md bg-gray-50 p-3">
+        <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+          <span>
+            <span className="text-gray-600">Entry estimate: </span>
+            <span className="font-medium text-gray-900">
+              {formatPrice(scorecard.entryPriceEstimate)}
+            </span>
+          </span>
+          <span>
+            <span className="text-gray-600">Fair value estimate: </span>
+            <span className="font-medium text-gray-900">
+              {formatPrice(scorecard.fairValueEstimate)}
+            </span>
+          </span>
+        </div>
+        <p className="mt-1 text-xs text-gray-600">{scorecard.targetsBasis}</p>
       </div>
-      <p className="mt-1 text-xs text-gray-400">{scorecard.targetsBasis}</p>
     </div>
   );
 }

@@ -34,6 +34,15 @@ enum Recommendation {
   PASS
 }
 
+// How much data the two analysts actually had to work with — distinct from
+// ConfidenceRead, which is the Synthesizer's read on how clear the signal
+// is. Computed deterministically from the fetched data, not judged by the LLM.
+enum DataQuality {
+  THIN
+  ADEQUATE
+  RICH
+}
+
 model Candidate {
   id            String      @id @default(cuid())
   ticker        String
@@ -64,6 +73,10 @@ model Scorecard {
   entryPriceEstimate  Float?
   fairValueEstimate   Float?
   targetsBasis        String
+  currentPrice        Float?
+  sector              String?
+  industry            String?
+  dataQuality         DataQuality
   createdAt           DateTime       @default(now())
 
   @@index([candidateId])

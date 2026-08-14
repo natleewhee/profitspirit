@@ -125,12 +125,14 @@ export async function runTechnicalsAnalyst(market: MarketDataBundle): Promise<st
   );
 }
 
-// 3.3 Synthesizer / Debate Agent — reads both analysts' output plus the
-// original trigger reason. Produces bull/bear case + structured scorecard.
-// Never fills gaps the analysts didn't surface.
+// 3.3 Synthesizer / Debate Agent — reads both analysts' output. Deliberately
+// does not see the original trigger reason: that's a free-text field a human
+// typed when logging the candidate (often a placeholder, per candidate.notes
+// in practice) and shouldn't bias research that's meant to stand on the
+// data alone. Produces bull/bear case + structured scorecard. Never fills
+// gaps the analysts didn't surface.
 export async function runSynthesizer(params: {
   ticker: string;
-  triggerReason: string;
   fundamentalsSummary: string;
   technicalsSummary: string;
 }): Promise<Scorecard> {
@@ -149,11 +151,11 @@ export async function runSynthesizer(params: {
         role: "system",
         content:
           "You are the synthesizer in a small research pipeline. You read the " +
-          "Fundamentals Analyst's summary, the Technicals Analyst's summary, and " +
-          "the original reason this ticker was scanned. Produce a short bull case, " +
-          "a short bear case, an explicit confidence read (how much the two " +
-          "analysts' data actually supports a clear view), risk flags, and a " +
-          "recommendation of watch / research further / pass. " +
+          "Fundamentals Analyst's summary and the Technicals Analyst's summary. " +
+          "Produce a short bull case, a short bear case, an explicit confidence " +
+          "read (how much the two analysts' data actually supports a clear " +
+          "view), risk flags, and a recommendation of watch / research further " +
+          "/ pass. " +
           "You do not invent data: if the two analysts didn't surface something, " +
           "you don't either — no filling gaps with plausible-sounding guesses. " +
           "entryPriceEstimate and fairValueEstimate must be derived only from " +
@@ -167,7 +169,7 @@ export async function runSynthesizer(params: {
       },
       {
         role: "user",
-        content: `Ticker: ${params.ticker}\nOriginal scan trigger: ${params.triggerReason}\n\nFundamentals Analyst summary:\n${params.fundamentalsSummary}\n\nTechnicals Analyst summary:\n${params.technicalsSummary}\n\nasOf date to use: ${asOf}`,
+        content: `Ticker: ${params.ticker}\n\nFundamentals Analyst summary:\n${params.fundamentalsSummary}\n\nTechnicals Analyst summary:\n${params.technicalsSummary}\n\nasOf date to use: ${asOf}`,
       },
     ],
   });

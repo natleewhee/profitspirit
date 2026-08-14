@@ -51,7 +51,7 @@ export function ResearchPanel({ candidateId, initialScorecards }: Props) {
 
       <div className="mt-4 space-y-4">
         {scorecards.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500">
+          <div className="rounded-lg border border-dashed border-gray-300 p-8 text-center text-sm text-gray-600">
             No research runs yet. Click &ldquo;Run Research&rdquo; to generate the first
             scorecard.
           </div>
