@@ -136,13 +136,14 @@ export async function runSynthesizer(params: {
 }): Promise<Scorecard> {
   const asOf = new Date().toISOString().slice(0, 10);
 
+  // `json_schema` structured outputs are only supported on a subset of Groq
+  // models (llama-3.3-70b-versatile isn't one of them). `json_object` mode
+  // is supported broadly, so use that plus an explicit shape description in
+  // the prompt, and validate/parse the result with ScorecardSchema below.
   const completion = await getClient().chat.completions.create({
     model: MODEL,
     max_tokens: 2000,
-    response_format: {
-      type: "json_schema",
-      json_schema: { name: "scorecard", schema: SCORECARD_JSON_SCHEMA },
-    },
+    response_format: { type: "json_object" },
     messages: [
       {
         role: "system",
@@ -159,7 +160,10 @@ export async function runSynthesizer(params: {
           "numbers that actually appear in the two summaries (e.g. last close, " +
           "52-week range, valuation ratios) — if there isn't enough to ground an " +
           "estimate, return null for it rather than guessing, and say why in " +
-          "targetsBasis. Respond with the scorecard JSON only.",
+          "targetsBasis.\n\n" +
+          "Respond with ONLY a single JSON object, no markdown fences, no other " +
+          "text, matching exactly this shape:\n" +
+          JSON.stringify(SCORECARD_JSON_SCHEMA, null, 2),
       },
       {
         role: "user",
@@ -173,5 +177,9 @@ export async function runSynthesizer(params: {
     throw new Error(`Synthesizer returned no content for ${params.ticker}`);
   }
 
-  return ScorecardSchema.parse(JSON.parse(raw));
+  // json_object mode guarantees valid JSON but not markdown-fence-free output;
+  // strip fences if the model added them despite the instruction not to.
+  const stripped = raw.trim().replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
+
+  return ScorecardSchema.parse(JSON.parse(stripped));
 }
