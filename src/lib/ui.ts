@@ -223,6 +223,18 @@ export function formatMarketCap(value: number | null): string {
   return `$${value.toFixed(0)}`;
 }
 
+// --- Council of 5 consensus (see council.ts) ---
+export function formatCouncilConsensus(consensus: number | null): string {
+  return consensus === null ? "—" : `${consensus}/5`;
+}
+
+export function councilConsensusStyles(consensus: number | null): string {
+  if (consensus === null) return "bg-gray-200 text-gray-700";
+  if (consensus >= 3) return "bg-green-100 text-green-800";
+  if (consensus === 2) return "bg-amber-100 text-amber-800";
+  return "bg-red-100 text-red-800";
+}
+
 // --- Next earnings date ---
 export function formatEarningsProximity(iso: string | null): string | null {
   if (!iso) return null;

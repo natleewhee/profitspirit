@@ -5,7 +5,9 @@ import { THEME_LABELS, RECOMMENDATION_LABELS } from "@/lib/labels";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ResearchPanel } from "@/components/ResearchPanel";
 import { PriceBar } from "@/components/PriceBar";
+import { CouncilSection } from "@/components/CouncilSection";
 import { formatDate, scoreStyles, RECOMMENDATION_BORDER } from "@/lib/ui";
+import type { CouncilVerdict } from "@/lib/types";
 
 export default async function CandidateDetailPage({
   params,
@@ -78,6 +80,15 @@ export default async function CandidateDetailPage({
         )}
       </div>
 
+      {latest && (
+        <div className="mt-4">
+          <CouncilSection
+            verdicts={latest.councilVerdicts as unknown as CouncilVerdict[] | null}
+            consensus={latest.councilConsensus}
+          />
+        </div>
+      )}
+
       {/* Candidate metadata demoted to a single compact line — it's input,
           not output. */}
       <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-600">
@@ -131,6 +142,7 @@ export default async function CandidateDetailPage({
             asOf: sc.asOf.toISOString(),
             createdAt: sc.createdAt.toISOString(),
             nextEarningsDate: sc.nextEarningsDate ? sc.nextEarningsDate.toISOString() : null,
+            councilVerdicts: sc.councilVerdicts as unknown as CouncilVerdict[] | null,
           }))}
         />
       </div>

@@ -48,6 +48,8 @@ export async function GET(request: NextRequest) {
           fiftyDayAverage: true,
           twoHundredDayAverage: true,
           nextEarningsDate: true,
+          pegRatio: true,
+          councilConsensus: true,
         },
       },
       _count: { select: { scorecards: true } },

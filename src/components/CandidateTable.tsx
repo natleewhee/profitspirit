@@ -25,6 +25,8 @@ import {
   formatTrend,
   formatMarketCap,
   formatEarningsProximity,
+  formatCouncilConsensus,
+  councilConsensusStyles,
 } from "@/lib/ui";
 import { computeValuationGapPct } from "@/lib/research/gap";
 import { deriveRiskLevel } from "@/lib/research/risk";
@@ -313,6 +315,14 @@ export function CandidateTable({
                           latest.entryZoneHigh
                         )}
                       </div>
+                      {latest.councilConsensus !== null && (
+                        <span
+                          className={`mt-1 inline-block rounded-full px-1.5 py-0.5 text-[10px] font-bold ${councilConsensusStyles(latest.councilConsensus)}`}
+                          title="Council of 5 — how many favor entering"
+                        >
+                          {formatCouncilConsensus(latest.councilConsensus)} council
+                        </span>
+                      )}
                     </td>
                     <td className="whitespace-nowrap px-4 py-2">
                       <LivePriceChip quote={liveQuote} />

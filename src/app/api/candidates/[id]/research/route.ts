@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { fetchFundamentalsData } from "@/lib/research/fundamentalsData";
 import { fetchMarketData } from "@/lib/research/marketData";
-import { runFundamentalsAnalyst, runTechnicalsAnalyst, runSynthesizer } from "@/lib/research/agents";
+import { runFundamentalsAnalyst, runTechnicalsAnalyst, runSynthesizer, runCouncil } from "@/lib/research/agents";
 import type { Scorecard as AgentScorecard } from "@/lib/research/scorecard";
 import { buildScorecardExtras } from "@/lib/research/enrich";
 import type { DataQuality as AgentDataQuality } from "@/lib/research/enrich";
@@ -10,6 +10,7 @@ import { computeValuation, type ValuationVerdict as AgentValuationVerdict } from
 import { computeValuationGapPct, computeValuationScore } from "@/lib/research/gap";
 import { computeQualityScore } from "@/lib/research/quality";
 import { computeRiskScore, deriveRiskLevel, type RiskLevelBucket } from "@/lib/research/risk";
+import { computePegRatio, isMarginOfSafetyMet, tallyConsensus } from "@/lib/research/council";
 import {
   computeRecommendationScore,
   deriveRecommendation,
@@ -17,8 +18,10 @@ import {
   type RecommendationBucket,
 } from "@/lib/research/score";
 
-// Three sequential model calls plus two data fetches can take well past
-// Vercel's default 10s function timeout — give this route real headroom.
+// Four sequential-ish model calls (Fundamentals+Technicals run in parallel,
+// but Synthesizer and Council each depend on the prior stage) plus two data
+// fetches can take well past Vercel's default 10s function timeout — give
+// this route real headroom.
 export const maxDuration = 60;
 
 const CONFIDENCE_MAP: Record<AgentScorecard["confidenceRead"], "LOW" | "MEDIUM" | "HIGH"> = {
@@ -110,6 +113,31 @@ export async function POST(
   );
   const recommendation = deriveRecommendation(recommendationScore);
 
+  const pegRatio = computePegRatio(
+    market.found ? market.trailingPE : null,
+    fundamentals.found ? fundamentals.valuationInputs.earningsGrowth : null
+  );
+  const marginOfSafetyMet = isMarginOfSafetyMet(extras.currentPrice, valuation.entryZoneHigh);
+
+  const councilVerdicts = await runCouncil({
+    ticker: candidate.ticker,
+    bullCase: agentScorecard.bullCase,
+    bearCase: agentScorecard.bearCase,
+    riskFlags: agentScorecard.riskFlags,
+    numbers: {
+      recommendationScore,
+      valuationScore,
+      qualityScore,
+      riskScore,
+      entryZoneLow: valuation.entryZoneLow,
+      entryZoneHigh: valuation.entryZoneHigh,
+      currentPrice: extras.currentPrice,
+      pegRatio,
+      marginOfSafetyMet,
+    },
+  });
+  const councilConsensus = tallyConsensus(councilVerdicts);
+
   const scorecard = await prisma.scorecard.create({
     data: {
       candidateId: candidate.id,
@@ -143,6 +171,9 @@ export async function POST(
       twoHundredDayAverage: market.found ? market.twoHundredDayAverage : null,
       nextEarningsDate:
         market.found && market.nextEarningsDate ? new Date(market.nextEarningsDate) : null,
+      pegRatio,
+      councilVerdicts,
+      councilConsensus,
     },
   });
 

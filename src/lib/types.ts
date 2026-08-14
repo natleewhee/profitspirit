@@ -7,6 +7,8 @@ import {
   RiskLevel,
   ValuationVerdict,
 } from "@prisma/client";
+export type { CouncilVerdict } from "@/lib/research/council";
+import type { CouncilVerdict } from "@/lib/research/council";
 
 export type Candidate = {
   id: string;
@@ -52,6 +54,9 @@ export type Scorecard = {
   fiftyDayAverage: number | null;
   twoHundredDayAverage: number | null;
   nextEarningsDate: string | null;
+  pegRatio: number | null;
+  councilVerdicts: CouncilVerdict[] | null;
+  councilConsensus: number | null;
   createdAt: string;
 };
 
@@ -87,6 +92,8 @@ export type ScorecardSummary = Pick<
   | "fiftyDayAverage"
   | "twoHundredDayAverage"
   | "nextEarningsDate"
+  | "pegRatio"
+  | "councilConsensus"
 >;
 
 // Latest-two scorecards (for the delta chip) plus a total count, attached
