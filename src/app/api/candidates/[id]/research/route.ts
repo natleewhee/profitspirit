@@ -120,5 +120,14 @@ export async function POST(
     },
   });
 
+  // Status is a human decision field (watchlist/portfolio/passed); it
+  // shouldn't also have to answer "has this been researched" — that's
+  // derived from scorecards.length elsewhere. But a candidate untouched
+  // since creation is fair to promote automatically. Never overwrites a
+  // deliberate status (PASSED, ADDED_TO_WATCHLIST, etc.) — only NEW.
+  if (candidate.status === "NEW") {
+    await prisma.candidate.update({ where: { id }, data: { status: "RESEARCHED" } });
+  }
+
   return NextResponse.json(scorecard, { status: 201 });
 }

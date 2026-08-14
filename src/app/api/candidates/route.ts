@@ -14,9 +14,41 @@ export async function GET(request: NextRequest) {
   const candidates = await prisma.candidate.findMany({
     where,
     orderBy: { dateScanned: "desc" },
+    include: {
+      // Latest 2 (not just 1) so the table can show a score delta vs the
+      // previous run. Deliberately `select`-ed, not a full `include` — the
+      // four prose fields (fundamentalsSummary, technicalsSummary,
+      // bullCase, bearCase) are kilobytes each and don't belong in a list
+      // payload. See docs/dashboard-ux-review.md §2.1.
+      scorecards: {
+        orderBy: { createdAt: "desc" },
+        take: 2,
+        select: {
+          id: true,
+          asOf: true,
+          createdAt: true,
+          recommendationScore: true,
+          recommendation: true,
+          valuationVerdict: true,
+          fairValueEstimate: true,
+          currentPrice: true,
+          entryPriceEstimate: true,
+          riskLevel: true,
+          confidenceRead: true,
+          dataQuality: true,
+          sector: true,
+        },
+      },
+      _count: { select: { scorecards: true } },
+    },
   });
 
-  return NextResponse.json(candidates);
+  const withCount = candidates.map(({ _count, ...c }) => ({
+    ...c,
+    scorecardCount: _count.scorecards,
+  }));
+
+  return NextResponse.json(withCount);
 }
 
 export async function POST(request: NextRequest) {

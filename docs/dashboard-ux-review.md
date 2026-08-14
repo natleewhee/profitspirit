@@ -370,7 +370,7 @@ an entire class of future bug.
 
 ## 5. Prioritisation and sequencing
 
-### Tier 1 — Quick wins (one sitting, ~half a day total)
+### Tier 1 — Quick wins (one sitting, ~half a day total) — **Built**
 
 Ship these together as one change. They are the owner's actual complaint.
 

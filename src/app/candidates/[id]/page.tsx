@@ -4,14 +4,7 @@ import { prisma } from "@/lib/db";
 import { THEME_LABELS } from "@/lib/labels";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ResearchPanel } from "@/components/ResearchPanel";
-
-function formatDate(date: Date) {
-  return date.toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
+import { formatDate } from "@/lib/ui";
 
 export default async function CandidateDetailPage({
   params,
@@ -51,7 +44,9 @@ export default async function CandidateDetailPage({
           <dt className="text-xs font-semibold uppercase tracking-wide text-gray-600">
             Date Scanned
           </dt>
-          <dd className="mt-0.5 text-sm text-gray-900">{formatDate(candidate.dateScanned)}</dd>
+          <dd className="mt-0.5 text-sm text-gray-900">
+            {formatDate(candidate.dateScanned.toISOString())}
+          </dd>
         </div>
         <div>
           <dt className="text-xs font-semibold uppercase tracking-wide text-gray-600">Status</dt>
