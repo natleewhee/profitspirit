@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 
@@ -18,6 +18,15 @@ export const metadata: Metadata = {
   description: "Weekly stock scan candidate tracker",
 };
 
+// This app is light-mode-only today. Without this, browsers that force dark
+// mode on pages with no declared color-scheme invert the background but
+// leave authored text colors alone — producing dark-gray-on-near-black text
+// that's barely legible (exactly what shows up on a device/browser set to
+// dark mode).
+export const viewport: Viewport = {
+  colorScheme: "light",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -26,7 +35,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} bg-white text-gray-900 antialiased`}
       >
         {children}
       </body>
