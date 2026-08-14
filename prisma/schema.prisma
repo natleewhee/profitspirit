@@ -28,10 +28,29 @@ enum ConfidenceRead {
   HIGH
 }
 
+// Derived deterministically from recommendationScore (score.ts) — not an
+// independent LLM choice, so it can never contradict the score.
 enum Recommendation {
   WATCH
   RESEARCH_FURTHER
   PASS
+}
+
+// LLM-judged, grounded in explicit risk signals fed into the Synthesizer
+// prompt (debt/liquidity ratios, price volatility) — see agents.ts.
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+// Deterministic, computed by valuation.ts from currentPrice vs
+// fairValueEstimate — not an LLM judgment.
+enum ValuationVerdict {
+  UNDERVALUED
+  OVERVALUED
+  FAIRLY_VALUED
+  INSUFFICIENT_DATA
 }
 
 // How much data the two analysts actually had to work with — distinct from
@@ -59,9 +78,9 @@ model Candidate {
 // Phase 2 — one row per research-agent run (docs/research-agent-scope.md §5).
 // A candidate can be re-researched over time, so this is a history, not a 1:1.
 model Scorecard {
-  id                  String         @id @default(cuid())
+  id                  String           @id @default(cuid())
   candidateId         String
-  candidate           Candidate      @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  candidate           Candidate        @relation(fields: [candidateId], references: [id], onDelete: Cascade)
   asOf                DateTime
   fundamentalsSummary String
   technicalsSummary   String
@@ -77,7 +96,10 @@ model Scorecard {
   sector              String?
   industry            String?
   dataQuality         DataQuality
-  createdAt           DateTime       @default(now())
+  riskLevel           RiskLevel
+  valuationVerdict    ValuationVerdict
+  recommendationScore Int?
+  createdAt           DateTime         @default(now())
 
   @@index([candidateId])
 }

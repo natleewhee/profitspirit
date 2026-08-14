@@ -15,6 +15,12 @@ import {
   runSynthesizer,
 } from "../../src/lib/research/agents";
 import { buildScorecardExtras } from "../../src/lib/research/enrich";
+import { computeValuation } from "../../src/lib/research/valuation";
+import {
+  computeRecommendationScore,
+  deriveRecommendation,
+  capConfidenceByDataQuality,
+} from "../../src/lib/research/score";
 
 const OUTPUT_DIR = path.join(process.cwd(), "docs", "research-runs");
 
@@ -40,9 +46,33 @@ async function runOne(ticker: string) {
     ticker,
     fundamentalsSummary,
     technicalsSummary,
+    riskSignals: {
+      debtToEquity: fundamentals.found ? fundamentals.keyRatios.debtToEquity : null,
+      currentRatio: fundamentals.found ? fundamentals.keyRatios.currentRatio : null,
+      fiftyTwoWeekHigh: market.found ? market.fiftyTwoWeekHigh : null,
+      fiftyTwoWeekLow: market.found ? market.fiftyTwoWeekLow : null,
+    },
   });
 
-  const enriched = { ...scorecard, ...buildScorecardExtras(fundamentals, market) };
+  const extras = buildScorecardExtras(fundamentals, market);
+  const valuation = computeValuation(fundamentals, market);
+  const cappedConfidence = capConfidenceByDataQuality(scorecard.confidenceRead, extras.dataQuality);
+  const recommendationScore = computeRecommendationScore(
+    extras.currentPrice,
+    valuation.fairValueEstimate,
+    scorecard.riskLevel,
+    cappedConfidence
+  );
+  const recommendation = deriveRecommendation(recommendationScore);
+
+  const enriched = {
+    ...scorecard,
+    confidenceRead: cappedConfidence,
+    ...extras,
+    ...valuation,
+    recommendationScore,
+    recommendation,
+  };
 
   console.log(`\n--- Scorecard: ${ticker} ---`);
   console.log(JSON.stringify(enriched, null, 2));

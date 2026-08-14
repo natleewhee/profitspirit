@@ -5,15 +5,15 @@ portfolio → risk → monitor). This is the free-tier, low-complexity version o
 the "AI trading desk" idea — same spirit (structured, multi-agent-scrutinized
 recommendations), radically smaller build.
 
-**Status:** Phases 1 and 2 built. The three-agent pipeline lives at
-`src/lib/research/` and is shared by the CLI script
-(`scripts/research-agent/run.ts`, Phase 1) and the dashboard's
+**Status:** Phases 1 and 2 built, plus a deterministic scoring layer that
+pulls Stage 3 ("score") of the original six-stage pipeline forward into this
+build. The pipeline lives at `src/lib/research/` and is shared by the CLI
+script (`scripts/research-agent/run.ts`, Phase 1) and the dashboard's
 `POST /api/candidates/[id]/research` route + candidate detail page (Phase 2).
-See README's "Research agent" section for how to run either. **Not yet run
-against real tickers** — this was built and merged ahead of the "judge Phase 1
-output before building Phase 2" checkpoint the phasing below calls for,
-at explicit user request. Worth actually running it and checking quality
-now that both are live, since Phase 3/4 decisions still depend on that.
+See README's "Research agent" section for how to run either, and §5a below
+for the scoring architecture. **Confirmed working against one real ticker
+(GOOG)** as of the Groq/Yahoo Finance switch; the scoring layer itself is
+new and not yet tested against a real ticker.
 
 ---
 
@@ -162,6 +162,49 @@ what was fetched), not the Synthesizer's read on how clear the signal is.
 logging the candidate — often a placeholder — and research is meant to
 stand on the fetched data alone, not be biased by whatever was typed at
 scan time.
+
+## 5a. Scoring architecture (Stage 3 pulled forward)
+
+Added after the first real scorecard (GOOG) showed `fairValueEstimate`
+coming back null constantly — the Synthesizer was trying to eyeball a
+number from prose, which doesn't work. The fix follows the same rule as
+§5's `currentPrice`/`sector`/`dataQuality`: **anything computable, compute
+it in code; only ask the LLM for genuine judgment.**
+
+**`src/lib/research/valuation.ts` (deterministic, not LLM):**
+`entryPriceEstimate`, `fairValueEstimate`, and `valuationVerdict`
+(`undervalued`/`overvalued`/`fairly_valued`/`insufficient_data`) are
+computed from fetched fundamentals using two disclosed formulas, averaged
+when both are available:
+- **Graham Number** — `√(22.5 × trailing EPS × book value/share)`. Needs
+  positive EPS and book value; null for unprofitable companies.
+- **FCF yield** — free cash flow/share ÷ an 8% required yield (a stated
+  assumption, not a fact — equivalent to a ~12.5× FCF multiple).
+- Entry price = fair value × 0.75 (a 25% margin of safety, standard
+  value-investing convention).
+- The methodology actually used is always written into `targetsBasis` —
+  never a bare number with no explanation.
+
+**Synthesizer (LLM) — narrowed, not removed:** no longer produces price
+targets or a recommendation. Still produces `bullCase`, `bearCase`,
+`riskFlags`, and two genuine judgment calls: `riskLevel`
+(`low`/`medium`/`high`) and `confidenceRead`. `riskLevel` is grounded in
+explicit numeric risk signals fed into its prompt (debt-to-equity, current
+ratio, 52-week range) rather than free-floating vibes.
+
+**`src/lib/research/score.ts` (deterministic, not LLM):**
+- `confidenceRead` is capped by `dataQuality` after the LLM call — thin
+  data can never produce a "high confidence" scorecard, regardless of what
+  the model said.
+- `recommendationScore` (0–100): starts from the valuation gap
+  (`(fairValue − currentPrice) / currentPrice`, saturating at ±50%), then
+  dampened toward 50 by risk level and confidence (low risk + high
+  confidence preserves the raw signal; high risk or low confidence pulls
+  the score toward neutral). Null if there's no fair value to compare
+  against.
+- `recommendation` (watch/research further/pass) is **derived from the
+  score** via fixed thresholds (≥65 / 35–64 / <35), not chosen
+  independently by the LLM — so the label can never contradict the number.
 
 ## 6. Obsidian's role
 
