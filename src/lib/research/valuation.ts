@@ -60,8 +60,13 @@ const GRAHAM_BASE_YIELD = 4.4; // AA corporate bond yield the formula was calibr
 const CURRENT_AA_BOND_YIELD = 5.5;
 // Cap the growth input — Graham's own formula gets overoptimistic well
 // past this, extrapolating a high current growth rate as if it persists
-// indefinitely. Treat missing/negative growth as flat (0%) rather than
+// indefinitely. A *measured* negative growth rate floors at 0% rather than
 // penalizing it twice (the EPS term already reflects a shrinking business).
+// Missing growth data is NOT treated the same as measured-zero growth —
+// see grahamRevised below; conflating "unmeasured" with "flat" used to
+// silently value a stock at this formula's most punitive multiple (6.8x
+// earnings) whenever Yahoo simply didn't return earningsGrowth, which is
+// common for smaller caps and foreign listings.
 const GRAHAM_GROWTH_CAP_PCT = 15;
 
 // Below this book-value-per-share to trailing-EPS ratio, a business is
@@ -77,10 +82,13 @@ function grahamRevised(
   earningsGrowth: number | null
 ): { value: number; growthPct: number } | null {
   if (trailingEps === null || trailingEps <= 0) return null;
-  const growthPct = Math.max(
-    0,
-    Math.min(GRAHAM_GROWTH_CAP_PCT, (earningsGrowth ?? 0) * 100)
-  );
+  // Missing growth data means this method has no growth signal at all — it
+  // is NOT the same as a measured 0% growth rate, and shouldn't silently
+  // default to one (the formula's floor, and its most punitive value).
+  // Let the whole method drop out here; computeValuation falls back to
+  // FCF yield alone, or insufficient_data if that's unavailable too.
+  if (earningsGrowth === null) return null;
+  const growthPct = Math.max(0, Math.min(GRAHAM_GROWTH_CAP_PCT, earningsGrowth * 100));
   const value =
     trailingEps *
     (GRAHAM_BASE_MULTIPLE + GRAHAM_GROWTH_WEIGHT * growthPct) *

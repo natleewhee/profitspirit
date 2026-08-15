@@ -49,10 +49,18 @@ const SCORECARD_JSON_SCHEMA = {
   ],
 };
 
+// temperature: 0 (+ a fixed seed, best-effort on Groq's infra) so re-running
+// research on an unchanged ticker doesn't move confidenceRead/riskLevel —
+// and therefore recommendationScore — on sampling noise alone. Previously
+// unset (provider default ~1.0), which meant the composite score could
+// shift between the watch/research_further/pass buckets on identical data.
+const DETERMINISTIC_SAMPLING = { temperature: 0, seed: 42 } as const;
+
 async function chat(system: string, user: string, maxTokens: number): Promise<string> {
   const completion = await getClient().chat.completions.create({
     model: MODEL,
     max_tokens: maxTokens,
+    ...DETERMINISTIC_SAMPLING,
     messages: [
       { role: "system", content: system },
       { role: "user", content: user },
@@ -151,6 +159,7 @@ export async function runSynthesizer(params: {
     model: MODEL,
     max_tokens: 2000,
     response_format: { type: "json_object" },
+    ...DETERMINISTIC_SAMPLING,
     messages: [
       {
         role: "system",

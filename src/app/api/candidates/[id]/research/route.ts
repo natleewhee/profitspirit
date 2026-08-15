@@ -73,6 +73,26 @@ export async function POST(
     fetchMarketData(candidate.ticker),
   ]);
 
+  // Both sources failing (bad ticker, delisted, Yahoo outage) previously
+  // still produced a complete-looking scorecard — the Synthesizer would
+  // write plausible prose from two "no data available" placeholder
+  // strings, and every null score defaulted to a neutral-positive bucket
+  // (deriveRecommendation(null) → "research_further",
+  // deriveRiskLevel(null) → "medium"). Nothing distinguished that from a
+  // real read on a mediocre company. Fail loudly instead of writing a
+  // fake-normal row.
+  if (!fundamentals.found && !market.found) {
+    return NextResponse.json(
+      {
+        error:
+          `No data available for ${candidate.ticker} from Yahoo Finance ` +
+          `(fundamentals: ${fundamentals.reason}; market data: ${market.reason}). ` +
+          "Check the ticker symbol, or try again if this looks like a transient outage.",
+      },
+      { status: 422 }
+    );
+  }
+
   const [fundamentalsSummary, technicalsSummary] = await Promise.all([
     runFundamentalsAnalyst(fundamentals),
     runTechnicalsAnalyst(market),

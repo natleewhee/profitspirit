@@ -12,6 +12,12 @@ const HIGH = 5;
 
 function leverageScore(debtToEquity: number | null): number | null {
   if (debtToEquity === null) return null;
+  // Negative D/E comes from negative shareholders' equity (debt outpacing
+  // assets, often from heavy buybacks or accumulated losses) — a genuine
+  // leverage red flag, not "less than 50% levered". Without this guard a
+  // negative value satisfies every threshold below and reads as the
+  // lowest possible risk, which is backwards.
+  if (debtToEquity < 0) return HIGH;
   if (debtToEquity < 50) return LOW;
   if (debtToEquity < 100) return BELOW_AVG;
   if (debtToEquity < 150) return AVG;

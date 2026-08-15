@@ -23,7 +23,14 @@ function bandScore(value: number | null, floor: number, ceiling: number): number
 }
 
 export function computeQualityScore(keyRatios: KeyRatios): number | null {
-  const roeScore = bandScore(keyRatios.returnOnEquity, 0, 0.25); // 0% -> 0, 25%+ -> 100
+  // Negative shareholders' equity makes ROE arithmetic meaningless — a net
+  // loss divided by negative equity comes back positive, sometimes maximally
+  // so, which would score a distressed balance sheet as excellent. debtToEquity
+  // shares ROE's denominator, so a negative D/E is the signal equity itself
+  // is negative; exclude ROE from the composite entirely in that case rather
+  // than let a sign-flip corruption through. See risk.ts's matching guard.
+  const equityIsNegative = keyRatios.debtToEquity !== null && keyRatios.debtToEquity < 0;
+  const roeScore = equityIsNegative ? null : bandScore(keyRatios.returnOnEquity, 0, 0.25); // 0% -> 0, 25%+ -> 100
   const grossMarginScore = bandScore(keyRatios.grossMargins, 0, 0.7); // 0% -> 0, 70%+ -> 100
   const operatingMarginScore = bandScore(keyRatios.operatingMargins, 0, 0.3); // 0% -> 0, 30%+ -> 100
   const profitMarginScore = bandScore(keyRatios.profitMargins, 0, 0.25); // 0% -> 0, 25%+ -> 100
