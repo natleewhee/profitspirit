@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { fetchFundamentalsData } from "@/lib/research/fundamentalsData";
 import { fetchMarketData } from "@/lib/research/marketData";
-import { runFundamentalsAnalyst, runTechnicalsAnalyst, runSynthesizer } from "@/lib/research/agents";
+import { runFundamentalsAnalyst, runTechnicalsAnalyst, runSynthesizer, ResearchApiError } from "@/lib/research/agents";
 import type { Scorecard as AgentScorecard } from "@/lib/research/scorecard";
 import { buildScorecardExtras } from "@/lib/research/enrich";
 import type { DataQuality as AgentDataQuality } from "@/lib/research/enrich";
@@ -93,22 +93,44 @@ export async function POST(
     );
   }
 
-  const [fundamentalsSummary, technicalsSummary] = await Promise.all([
-    runFundamentalsAnalyst(fundamentals),
-    runTechnicalsAnalyst(market),
-  ]);
+  // Groq errors (rate limits especially — the free tier has a daily token
+  // budget, not just a per-minute one) previously propagated unhandled and
+  // 500'd with a raw stack trace. describeGroqError (agents.ts) translates
+  // known Groq failures into a message with an actual reset time; anything
+  // else still surfaces as a real error rather than a fake-normal scorecard.
+  let fundamentalsSummary: string;
+  let technicalsSummary: string;
+  try {
+    [fundamentalsSummary, technicalsSummary] = await Promise.all([
+      runFundamentalsAnalyst(fundamentals),
+      runTechnicalsAnalyst(market),
+    ]);
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Research analysts failed — check server logs." },
+      { status: err instanceof ResearchApiError ? 429 : 502 }
+    );
+  }
 
-  const agentScorecard = await runSynthesizer({
-    ticker: candidate.ticker,
-    fundamentalsSummary,
-    technicalsSummary,
-    riskSignals: {
-      debtToEquity: fundamentals.found ? fundamentals.keyRatios.debtToEquity : null,
-      currentRatio: fundamentals.found ? fundamentals.keyRatios.currentRatio : null,
-      fiftyTwoWeekHigh: market.found ? market.fiftyTwoWeekHigh : null,
-      fiftyTwoWeekLow: market.found ? market.fiftyTwoWeekLow : null,
-    },
-  });
+  let agentScorecard;
+  try {
+    agentScorecard = await runSynthesizer({
+      ticker: candidate.ticker,
+      fundamentalsSummary,
+      technicalsSummary,
+      riskSignals: {
+        debtToEquity: fundamentals.found ? fundamentals.keyRatios.debtToEquity : null,
+        currentRatio: fundamentals.found ? fundamentals.keyRatios.currentRatio : null,
+        fiftyTwoWeekHigh: market.found ? market.fiftyTwoWeekHigh : null,
+        fiftyTwoWeekLow: market.found ? market.fiftyTwoWeekLow : null,
+      },
+    });
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Synthesizer failed — check server logs." },
+      { status: err instanceof ResearchApiError ? 429 : 502 }
+    );
+  }
 
   const extras = buildScorecardExtras(fundamentals, market);
   const valuation = computeValuation(fundamentals, market);

@@ -1,4 +1,4 @@
-import Groq from "groq-sdk";
+import Groq, { APIError, RateLimitError } from "groq-sdk";
 import type { FundamentalsBundle } from "./fundamentalsData";
 import type { MarketDataBundle } from "./marketData";
 import { ScorecardSchema, type Scorecard } from "./scorecard";
@@ -10,6 +10,45 @@ let client: Groq | undefined;
 function getClient(): Groq {
   if (!client) client = new Groq();
   return client;
+}
+
+// Distinguishes a translated, user-facing Groq failure from any other
+// thrown error, so the route can respond with the right status/message
+// instead of a raw stack trace. See describeGroqError below.
+export class ResearchApiError extends Error {}
+
+function getRetryAfterSeconds(headers: Headers | undefined): number | null {
+  const value = headers?.get?.("retry-after");
+  if (!value) return null;
+  const seconds = Number(value);
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : null;
+}
+
+// Groq's free tier has a daily token budget (separate from the per-minute
+// rate limit), and this pipeline can burn through it on a busy research
+// day. The raw error is an opaque 429 with the reset time buried in a
+// `retry-after` header — surface that as an actual clock time instead of
+// letting the request 500 with a stack trace the UI has no way to explain.
+function describeGroqError(err: unknown): Error {
+  if (err instanceof RateLimitError) {
+    const retryAfterSec = getRetryAfterSeconds(err.headers);
+    if (retryAfterSec !== null) {
+      const resetAt = new Date(Date.now() + retryAfterSec * 1000);
+      const resetLabel = resetAt.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+      const minutes = Math.max(1, Math.round(retryAfterSec / 60));
+      return new ResearchApiError(
+        `Groq's free-tier token limit is used up for now. Resets around ${resetLabel} ` +
+          `(in about ${minutes} minute${minutes === 1 ? "" : "s"}) — try research again after that.`
+      );
+    }
+    return new ResearchApiError(
+      "Groq's free-tier rate limit was hit. Wait a bit and try research again."
+    );
+  }
+  if (err instanceof APIError) {
+    return new ResearchApiError(`Groq API error (${err.status ?? "unknown"}): ${err.message}`);
+  }
+  return err instanceof Error ? err : new ResearchApiError(String(err));
 }
 
 // Free-tier Groq model — good instruction-following, generous rate limits.
@@ -57,16 +96,20 @@ const SCORECARD_JSON_SCHEMA = {
 const DETERMINISTIC_SAMPLING = { temperature: 0, seed: 42 } as const;
 
 async function chat(system: string, user: string, maxTokens: number): Promise<string> {
-  const completion = await getClient().chat.completions.create({
-    model: MODEL,
-    max_tokens: maxTokens,
-    ...DETERMINISTIC_SAMPLING,
-    messages: [
-      { role: "system", content: system },
-      { role: "user", content: user },
-    ],
-  });
-  return completion.choices[0]?.message?.content ?? "";
+  try {
+    const completion = await getClient().chat.completions.create({
+      model: MODEL,
+      max_tokens: maxTokens,
+      ...DETERMINISTIC_SAMPLING,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: user },
+      ],
+    });
+    return completion.choices[0]?.message?.content ?? "";
+  } catch (err) {
+    throw describeGroqError(err);
+  }
 }
 
 // 3.1 Fundamentals Analyst — reads Yahoo Finance's fundamentals data only
@@ -155,35 +198,40 @@ export async function runSynthesizer(params: {
   // models (llama-3.3-70b-versatile isn't one of them). `json_object` mode
   // is supported broadly, so use that plus an explicit shape description in
   // the prompt, and validate/parse the result with ScorecardSchema below.
-  const completion = await getClient().chat.completions.create({
-    model: MODEL,
-    max_tokens: 2000,
-    response_format: { type: "json_object" },
-    ...DETERMINISTIC_SAMPLING,
-    messages: [
-      {
-        role: "system",
-        content:
-          "You are the synthesizer in a small research pipeline. You read the " +
-          "Fundamentals Analyst's summary, the Technicals Analyst's summary, " +
-          "and a few raw risk signals (debt-to-equity, current ratio, 52-week " +
-          "range). Produce a short bull case, a short bear case, risk flags, " +
-          "an overall riskLevel (low/medium/high — weigh the debt and liquidity " +
-          "ratios given, plus anything the bear case surfaces), and a " +
-          "confidenceRead for how much the data actually supports your risk " +
-          "level and overall read. " +
-          "You do not invent data: if the two analysts didn't surface something, " +
-          "you don't either — no filling gaps with plausible-sounding guesses.\n\n" +
-          "Respond with ONLY a single JSON object, no markdown fences, no other " +
-          "text, matching exactly this shape:\n" +
-          JSON.stringify(SCORECARD_JSON_SCHEMA, null, 2),
-      },
-      {
-        role: "user",
-        content: `Ticker: ${params.ticker}\n\nFundamentals Analyst summary:\n${params.fundamentalsSummary}\n\nTechnicals Analyst summary:\n${params.technicalsSummary}\n\nRaw risk signals:\n${JSON.stringify(params.riskSignals, null, 2)}\n\nasOf date to use: ${asOf}`,
-      },
-    ],
-  });
+  let completion;
+  try {
+    completion = await getClient().chat.completions.create({
+      model: MODEL,
+      max_tokens: 2000,
+      response_format: { type: "json_object" },
+      ...DETERMINISTIC_SAMPLING,
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are the synthesizer in a small research pipeline. You read the " +
+            "Fundamentals Analyst's summary, the Technicals Analyst's summary, " +
+            "and a few raw risk signals (debt-to-equity, current ratio, 52-week " +
+            "range). Produce a short bull case, a short bear case, risk flags, " +
+            "an overall riskLevel (low/medium/high — weigh the debt and liquidity " +
+            "ratios given, plus anything the bear case surfaces), and a " +
+            "confidenceRead for how much the data actually supports your risk " +
+            "level and overall read. " +
+            "You do not invent data: if the two analysts didn't surface something, " +
+            "you don't either — no filling gaps with plausible-sounding guesses.\n\n" +
+            "Respond with ONLY a single JSON object, no markdown fences, no other " +
+            "text, matching exactly this shape:\n" +
+            JSON.stringify(SCORECARD_JSON_SCHEMA, null, 2),
+        },
+        {
+          role: "user",
+          content: `Ticker: ${params.ticker}\n\nFundamentals Analyst summary:\n${params.fundamentalsSummary}\n\nTechnicals Analyst summary:\n${params.technicalsSummary}\n\nRaw risk signals:\n${JSON.stringify(params.riskSignals, null, 2)}\n\nasOf date to use: ${asOf}`,
+        },
+      ],
+    });
+  } catch (err) {
+    throw describeGroqError(err);
+  }
 
   const raw = completion.choices[0]?.message?.content;
   if (!raw) {
