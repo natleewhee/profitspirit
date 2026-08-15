@@ -55,6 +55,22 @@ export function CandidateDetailBody({ latest }: Props) {
         <Stat label="Div Yield" value={formatPercent(latest.dividendYield)} />
       </div>
 
+      {(latest.grahamValue !== null || latest.fcfYieldValue !== null) && (
+        <div className="mt-4">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            Valuation methods
+          </h3>
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            Shown separately, not just averaged — they answer different questions and can
+            reasonably disagree.
+          </p>
+          <div className="mt-1.5 grid grid-cols-2 gap-3">
+            <Stat label="Graham (earnings-based)" value={formatPrice(latest.grahamValue)} />
+            <Stat label="FCF yield (cash-based)" value={formatPrice(latest.fcfYieldValue)} />
+          </div>
+        </div>
+      )}
+
       <div className="mt-4">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
           Why it&rsquo;s interesting

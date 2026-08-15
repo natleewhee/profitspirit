@@ -58,13 +58,22 @@ export function deriveRecommendation(score: number | null): RecommendationBucket
 }
 
 // dataQuality is known for certain (computed from what was actually
-// fetched); confidenceRead is the LLM's judgment. Thin data should never
-// be allowed to produce a "high confidence" scorecard, so this caps it
-// after the fact rather than trusting the model to self-limit.
+// fetched); confidenceRead is the LLM's judgment. Previously this only
+// handled thin+high, leaving thin+medium and adequate-at-any-confidence
+// uncapped — a ticker with barely-populated ratios could still carry
+// "medium" or even "high" confidence through to the final score. Every
+// data-quality tier now has a hard ceiling instead of one special case.
+const CONFIDENCE_RANK: Record<ConfidenceRead, number> = { low: 0, medium: 1, high: 2 };
+const CONFIDENCE_CEILING: Record<"thin" | "adequate" | "rich", ConfidenceRead> = {
+  thin: "low",
+  adequate: "medium",
+  rich: "high",
+};
+
 export function capConfidenceByDataQuality(
   confidenceRead: ConfidenceRead,
   dataQuality: "thin" | "adequate" | "rich"
 ): ConfidenceRead {
-  if (dataQuality === "thin" && confidenceRead === "high") return "medium";
-  return confidenceRead;
+  const ceiling = CONFIDENCE_CEILING[dataQuality];
+  return CONFIDENCE_RANK[confidenceRead] > CONFIDENCE_RANK[ceiling] ? ceiling : confidenceRead;
 }

@@ -114,8 +114,13 @@ export async function POST(
   const valuation = computeValuation(fundamentals, market);
   const cappedConfidence = capConfidenceByDataQuality(agentScorecard.confidenceRead, extras.dataQuality);
 
+  // insufficient_data now also covers the case where Graham and FCF yield
+  // diverge by more than 2x (see valuation.ts) — fairValueEstimate is still
+  // a number in that case (the average), but it's not a confident one, so
+  // the primary scoring axis shouldn't treat it as one either.
   const gapPct = computeValuationGapPct(extras.currentPrice, valuation.fairValueEstimate);
-  const valuationScore = computeValuationScore(gapPct);
+  const valuationScore =
+    valuation.valuationVerdict === "insufficient_data" ? null : computeValuationScore(gapPct);
   const qualityScore = fundamentals.found ? computeQualityScore(fundamentals.keyRatios) : null;
   const riskScore = computeRiskScore({
     debtToEquity: fundamentals.found ? fundamentals.keyRatios.debtToEquity : null,
@@ -150,6 +155,8 @@ export async function POST(
       qualityScore,
       entryPriceEstimate: valuation.entryPriceEstimate,
       fairValueEstimate: valuation.fairValueEstimate,
+      grahamValue: valuation.grahamValue,
+      fcfYieldValue: valuation.fcfYieldValue,
       entryZoneLow: valuation.entryZoneLow,
       entryZoneHigh: valuation.entryZoneHigh,
       valuationVerdict: VALUATION_VERDICT_MAP[valuation.valuationVerdict],

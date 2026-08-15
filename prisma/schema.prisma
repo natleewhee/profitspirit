@@ -96,7 +96,19 @@ model Scorecard {
   riskFlags            String[]
   recommendation       Recommendation
   entryPriceEstimate   Float?
+  // fairValueEstimate is the average of grahamValue/fcfYieldValue below
+  // when both are available — kept for backward-compat consumers (entry
+  // zone, sort-by-gap, PriceBar) that need one number. The two methods
+  // answer different questions and routinely disagree 2-4x; when they do,
+  // valuationVerdict is forced to INSUFFICIENT_DATA rather than presenting
+  // a confident verdict off an average neither method actually supports.
+  // See valuation.ts's DIVERGENCE_RATIO_THRESHOLD.
   fairValueEstimate    Float?
+  // Graham's revised formula and FCF-yield's raw, un-averaged outputs —
+  // stored separately so a wide disagreement between them is visible as
+  // two real numbers, not hidden inside fairValueEstimate.
+  grahamValue          Float?
+  fcfYieldValue        Float?
   targetsBasis         String
   currentPrice         Float?
   sector               String?

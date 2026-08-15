@@ -31,6 +31,8 @@ export async function GET(request: NextRequest) {
           recommendation: true,
           valuationVerdict: true,
           fairValueEstimate: true,
+          grahamValue: true,
+          fcfYieldValue: true,
           currentPrice: true,
           entryPriceEstimate: true,
           entryZoneLow: true,

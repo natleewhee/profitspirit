@@ -33,6 +33,8 @@ export type Scorecard = {
   recommendation: Recommendation;
   entryPriceEstimate: number | null;
   fairValueEstimate: number | null;
+  grahamValue: number | null;
+  fcfYieldValue: number | null;
   entryZoneLow: number | null;
   entryZoneHigh: number | null;
   targetsBasis: string;
@@ -77,6 +79,8 @@ export type ScorecardSummary = Pick<
   | "recommendation"
   | "valuationVerdict"
   | "fairValueEstimate"
+  | "grahamValue"
+  | "fcfYieldValue"
   | "currentPrice"
   | "entryPriceEstimate"
   | "entryZoneLow"

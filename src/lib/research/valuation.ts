@@ -18,6 +18,12 @@ export type ValuationResult = {
   entryZoneHigh: number | null;
   valuationVerdict: ValuationVerdict;
   targetsBasis: string;
+  // The two methods' raw, un-averaged outputs — stored and shown
+  // separately (not just folded into targetsBasis prose) so a wide
+  // disagreement between them is visible as two real numbers, not hidden
+  // inside a single blended figure. See DIVERGENCE_RATIO_THRESHOLD below.
+  grahamValue: number | null;
+  fcfYieldValue: number | null;
 };
 
 // Margin-of-safety band applied to fair value to get a suggested entry
@@ -38,6 +44,17 @@ const REQUIRED_FCF_YIELD = 0.08;
 // Verdict band: within +/-10% of fair value counts as "fairly valued"
 // rather than forcing every case into a binary under/over call.
 const FAIRLY_VALUED_BAND = 0.1;
+
+// Graham-revised and FCF-yield answer genuinely different questions ("what
+// would a disciplined value investor pay for these earnings" vs. "what
+// return am I getting on cash the business actually generates") and
+// disagreeing by 2-4x is the normal case, not an anomaly, given Graham's
+// multiple ranges 6.8x-30.8x earnings while FCF yield is pinned at a flat
+// 12.5x FCF. Averaging two numbers that disagree this much manufactures a
+// blended figure neither method actually supports. When the larger value
+// is more than this many times the smaller, don't present a confident
+// verdict off the average — flag the disagreement instead.
+const DIVERGENCE_RATIO_THRESHOLD = 2;
 
 // --- Graham's REVISED formula: V = EPS x (8.5 + 2g) x 4.4/Y ---
 // The plain Graham Number (√(22.5 x EPS x book value/share)) assumes zero
@@ -102,6 +119,31 @@ function isAssetLight(trailingEps: number | null, bookValuePerShare: number | nu
   return bookValuePerShare / trailingEps < ASSET_LIGHT_BVPS_TO_EPS_THRESHOLD;
 }
 
+// For dual-class issuers (GOOG/GOOGL, BRK.B, META-class structures) Yahoo's
+// `sharesOutstanding` reflects only the queried share class, not the
+// company total — dividing FCF by it overstates FCF-per-share by roughly
+// the ratio of total-to-single-class shares. marketCap ÷ price gives the
+// true all-class count for free (both already fetched elsewhere in this
+// pipeline); prefer it whenever it disagrees meaningfully (>20%) with the
+// reported figure, since disagreement of that size is itself the signal
+// that `sharesOutstanding` is a single-class number.
+const SHARE_COUNT_DIVERGENCE_THRESHOLD = 1.2;
+
+function resolveSharesOutstanding(
+  reportedShares: number | null,
+  marketCap: number | null,
+  price: number | null
+): { shares: number | null; corrected: boolean } {
+  const impliedShares = marketCap !== null && price !== null && price > 0 ? marketCap / price : null;
+  if (impliedShares === null || impliedShares <= 0) return { shares: reportedShares, corrected: false };
+  if (reportedShares === null || reportedShares <= 0) return { shares: impliedShares, corrected: true };
+
+  const ratio = Math.max(reportedShares, impliedShares) / Math.min(reportedShares, impliedShares);
+  return ratio > SHARE_COUNT_DIVERGENCE_THRESHOLD
+    ? { shares: impliedShares, corrected: true }
+    : { shares: reportedShares, corrected: false };
+}
+
 function fcfYieldValue(freeCashflow: number | null, sharesOutstanding: number | null): number | null {
   if (freeCashflow === null || sharesOutstanding === null || sharesOutstanding <= 0) return null;
   if (freeCashflow <= 0) return null;
@@ -121,13 +163,20 @@ export function computeValuation(
       entryZoneHigh: null,
       valuationVerdict: "insufficient_data",
       targetsBasis: "No fundamentals data available to value this stock.",
+      grahamValue: null,
+      fcfYieldValue: null,
     };
   }
 
   const { trailingEps, bookValuePerShare, sharesOutstanding, earningsGrowth } =
     fundamentals.valuationInputs;
   const graham = grahamRevised(trailingEps, earningsGrowth);
-  const fcfValue = fcfYieldValue(fundamentals.keyRatios.freeCashflow, sharesOutstanding);
+  const { shares: resolvedShares, corrected: sharesCorrected } = resolveSharesOutstanding(
+    sharesOutstanding,
+    market.found ? market.marketCap : null,
+    market.found ? market.price : null
+  );
+  const fcfValue = fcfYieldValue(fundamentals.keyRatios.freeCashflow, resolvedShares);
   const assetLight = isAssetLight(trailingEps, bookValuePerShare);
 
   const methodsUsed: string[] = [];
@@ -140,8 +189,13 @@ export function computeValuation(
     estimates.push(graham.value);
   }
   if (fcfValue !== null) {
+    const shareCountNote = sharesCorrected
+      ? " (using marketCap÷price share count, not the reported figure — they disagreed by " +
+        "more than 20%, which usually means the reported figure is a single share class on a " +
+        "multi-class stock)"
+      : "";
     methodsUsed.push(
-      `FCF yield (free cash flow/share ÷ ${(REQUIRED_FCF_YIELD * 100).toFixed(0)}% required yield = $${fcfValue.toFixed(2)})`
+      `FCF yield (free cash flow/share ÷ ${(REQUIRED_FCF_YIELD * 100).toFixed(0)}% required yield = $${fcfValue.toFixed(2)}${shareCountNote})`
     );
     estimates.push(fcfValue);
   }
@@ -157,8 +211,18 @@ export function computeValuation(
         "Neither valuation method could compute: needs positive trailing EPS (Graham's revised " +
         "formula) or positive free cash flow + shares outstanding (FCF yield) — this ticker " +
         "didn't have enough of that data.",
+      grahamValue: null,
+      fcfYieldValue: null,
     };
   }
+
+  // Divergence check — see DIVERGENCE_RATIO_THRESHOLD above. Only
+  // meaningful when both methods actually ran; a single-method estimate
+  // has nothing to disagree with.
+  const diverges =
+    graham !== null &&
+    fcfValue !== null &&
+    Math.max(graham.value, fcfValue) / Math.min(graham.value, fcfValue) > DIVERGENCE_RATIO_THRESHOLD;
 
   const fairValueEstimate = estimates.reduce((a, b) => a + b, 0) / estimates.length;
   const entryPriceEstimate = fairValueEstimate * (1 - MARGIN_OF_SAFETY);
@@ -167,16 +231,26 @@ export function computeValuation(
 
   const basisPrefix =
     estimates.length === 2
-      ? `Average of two methods — ${methodsUsed.join(" and ")}.`
+      ? `${diverges ? "Methods disagree by more than 2x — NOT a confident average" : "Average of two methods"} — ${methodsUsed.join(" and ")}.`
       : `${methodsUsed[0]}.`;
   const assetLightNote = assetLight
     ? " Book value/share is thin relative to earnings (asset-light balance sheet, e.g. buyback-" +
       "heavy businesses) — the classic Graham Number would understate this stock, so it's excluded " +
       "in favor of the growth-adjusted formula above."
     : "";
-  const targetsBasis = `${basisPrefix} Entry zone applies a ${(MARGIN_OF_SAFETY_HIGH * 100).toFixed(0)}-${(MARGIN_OF_SAFETY_LOW * 100).toFixed(0)}% margin of safety below fair value.${assetLightNote}`;
+  const divergenceNote = diverges
+    ? " Graham's formula and FCF yield are answering different questions (earnings-based intrinsic " +
+      "value vs. cash-return-based value) and a 2x+ spread here means they genuinely disagree about " +
+      "this business — treat the figures above independently rather than trusting their average."
+    : "";
+  const targetsBasis = `${basisPrefix} Entry zone applies a ${(MARGIN_OF_SAFETY_HIGH * 100).toFixed(0)}-${(MARGIN_OF_SAFETY_LOW * 100).toFixed(0)}% margin of safety below fair value.${assetLightNote}${divergenceNote}`;
 
-  const valuationVerdict = computeVerdict(market.found ? market.price : null, fairValueEstimate);
+  // A verdict built on an average the two methods don't actually agree on
+  // isn't a confident undervalued/overvalued call — degrade to
+  // insufficient_data rather than present false precision.
+  const valuationVerdict = diverges
+    ? "insufficient_data"
+    : computeVerdict(market.found ? market.price : null, fairValueEstimate);
 
   return {
     entryPriceEstimate,
@@ -185,6 +259,8 @@ export function computeValuation(
     entryZoneHigh,
     valuationVerdict,
     targetsBasis,
+    grahamValue: graham?.value ?? null,
+    fcfYieldValue: fcfValue,
   };
 }
 
