@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { fetchFundamentalsData } from "@/lib/research/fundamentalsData";
 import { fetchMarketData } from "@/lib/research/marketData";
@@ -10,7 +11,7 @@ import { computeValuation, type ValuationVerdict as AgentValuationVerdict } from
 import { computeValuationGapPct, computeValuationScore } from "@/lib/research/gap";
 import { computeQualityScore } from "@/lib/research/quality";
 import { computeRiskScore, deriveRiskLevel, type RiskLevelBucket } from "@/lib/research/risk";
-import { computePegRatio, isMarginOfSafetyMet, tallyConsensus } from "@/lib/research/council";
+import { computePegRatio, isMarginOfSafetyMet, tallyConsensus, type CouncilVerdict } from "@/lib/research/council";
 import {
   computeRecommendationScore,
   deriveRecommendation,
@@ -119,24 +120,36 @@ export async function POST(
   );
   const marginOfSafetyMet = isMarginOfSafetyMet(extras.currentPrice, valuation.entryZoneHigh);
 
-  const councilVerdicts = await runCouncil({
-    ticker: candidate.ticker,
-    bullCase: agentScorecard.bullCase,
-    bearCase: agentScorecard.bearCase,
-    riskFlags: agentScorecard.riskFlags,
-    numbers: {
-      recommendationScore,
-      valuationScore,
-      qualityScore,
-      riskScore,
-      entryZoneLow: valuation.entryZoneLow,
-      entryZoneHigh: valuation.entryZoneHigh,
-      currentPrice: extras.currentPrice,
-      pegRatio,
-      marginOfSafetyMet,
-    },
-  });
-  const councilConsensus = tallyConsensus(councilVerdicts);
+  // Council is enrichment — five LLM personas reacting to numbers the rest
+  // of this route already computed deterministically. A malformed model
+  // response here (occasional bad JSON shape) must not throw away the
+  // valuation/quality/risk/synthesizer work that already succeeded above.
+  // Previously an uncaught Zod error here 500'd the entire request and
+  // blocked every research run, not just the council step.
+  let councilVerdicts: CouncilVerdict[] | null = null;
+  let councilConsensus: number | null = null;
+  try {
+    councilVerdicts = await runCouncil({
+      ticker: candidate.ticker,
+      bullCase: agentScorecard.bullCase,
+      bearCase: agentScorecard.bearCase,
+      riskFlags: agentScorecard.riskFlags,
+      numbers: {
+        recommendationScore,
+        valuationScore,
+        qualityScore,
+        riskScore,
+        entryZoneLow: valuation.entryZoneLow,
+        entryZoneHigh: valuation.entryZoneHigh,
+        currentPrice: extras.currentPrice,
+        pegRatio,
+        marginOfSafetyMet,
+      },
+    });
+    councilConsensus = tallyConsensus(councilVerdicts);
+  } catch (err) {
+    console.error(`Council step failed for ${candidate.ticker}, continuing without it:`, err);
+  }
 
   const scorecard = await prisma.scorecard.create({
     data: {
@@ -172,7 +185,7 @@ export async function POST(
       nextEarningsDate:
         market.found && market.nextEarningsDate ? new Date(market.nextEarningsDate) : null,
       pegRatio,
-      councilVerdicts,
+      councilVerdicts: councilVerdicts ?? Prisma.JsonNull,
       councilConsensus,
       trailingPE: market.found ? market.trailingPE : null,
       forwardPE: market.found ? market.forwardPE : null,

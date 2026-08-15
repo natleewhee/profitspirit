@@ -271,5 +271,13 @@ export async function runCouncil(params: {
   }
 
   const stripped = raw.trim().replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
-  return CouncilResponseSchema.parse(JSON.parse(stripped)).verdicts;
+  const parsed = JSON.parse(stripped);
+  // json_object mode guarantees valid JSON, not our exact shape — the model
+  // occasionally returns `verdicts` as an object keyed by persona name
+  // instead of an array. Recover rather than rejecting outright; a genuinely
+  // malformed response still fails the schema.parse below.
+  if (parsed && typeof parsed.verdicts === "object" && !Array.isArray(parsed.verdicts)) {
+    parsed.verdicts = Object.values(parsed.verdicts);
+  }
+  return CouncilResponseSchema.parse(parsed).verdicts;
 }
