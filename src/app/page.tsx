@@ -44,6 +44,14 @@ function paramsFromFilters(filters: Filters, extra: Record<string, string | null
   return params.toString();
 }
 
+// In-memory cache that survives component remounts (but not full page
+// reloads) — navigating to a detail/edit page and back unmounts
+// DashboardContent, and without this every "back" refetched from scratch,
+// showing a loading flash and losing scroll position in the process.
+// Session-lifetime only, intentionally not persisted to storage.
+let candidatesCache: CandidateWithLatest[] | null = null;
+let liveQuotesCache: Record<string, LiveQuote> = {};
+
 function DashboardContent() {
   const router = useRouter();
   const pathname = usePathname();
@@ -55,14 +63,15 @@ function DashboardContent() {
   const sortKey = (searchParams.get("sort") as SortKey) ?? DEFAULT_SORT_KEY;
   const sortAsc = searchParams.get("dir") === "asc" ? true : searchParams.get("dir") === "desc" ? false : DEFAULT_SORT_ASC;
 
-  const [candidates, setCandidates] = useState<CandidateWithLatest[]>([]);
+  const [candidates, setCandidates] = useState<CandidateWithLatest[]>(() => candidatesCache ?? []);
   // Distinguish the very first load (full-page "Loading…") from a refetch
   // after mutations (e.g. Run research) — previously both used the same
   // flag, which unmounted the table and threw away its state on every
-  // refetch, mid-interaction.
-  const [initialLoading, setInitialLoading] = useState(true);
+  // refetch, mid-interaction. Also skipped entirely when a cached list is
+  // already available from a previous mount this session.
+  const [initialLoading, setInitialLoading] = useState(() => candidatesCache === null);
   const [runningIds, setRunningIds] = useState<Set<string>>(new Set());
-  const [liveQuotes, setLiveQuotes] = useState<Record<string, LiveQuote>>({});
+  const [liveQuotes, setLiveQuotes] = useState<Record<string, LiveQuote>>(() => liveQuotesCache);
   const [loadError, setLoadError] = useState(false);
 
   const load = useCallback(async () => {
@@ -70,6 +79,7 @@ function DashboardContent() {
       const res = await fetch("/api/candidates");
       if (!res.ok) throw new Error("Failed to load candidates");
       const data = await res.json();
+      candidatesCache = data;
       setCandidates(data);
       setLoadError(false);
     } catch {
@@ -99,7 +109,10 @@ function DashboardContent() {
       const res = await fetch(`/api/quotes?tickers=${encodeURIComponent(tickerKey)}`);
       if (!res.ok || cancelled) return;
       const data = await res.json();
-      if (!cancelled) setLiveQuotes(data);
+      if (!cancelled) {
+        liveQuotesCache = data;
+        setLiveQuotes(data);
+      }
     }
 
     fetchQuotes();
@@ -264,14 +277,7 @@ function DashboardContent() {
   return (
     <main className="mx-auto w-full max-w-[1800px] px-4 py-8 sm:px-6 lg:px-8">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-gray-900">
-            Scan Candidates Dashboard
-          </h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Weekly Finviz scan output, logged by theme and scan date.
-          </p>
-        </div>
+        <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Candidates</h1>
         <AddCandidateModal onAdded={load} />
       </div>
 

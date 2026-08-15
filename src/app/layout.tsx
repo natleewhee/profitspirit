@@ -15,7 +15,7 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Coah | Scan Candidates",
+  title: "ProfitSpirit",
   description: "Weekly stock scan candidate tracker",
 };
 

@@ -1,4 +1,4 @@
-# Coah Scan Candidates Dashboard
+# ProfitSpirit
 
 A lightweight dashboard for logging and tracking weekly stock scan candidates
 (Stage 1 of the scan → research → score → portfolio → risk → monitor pipeline).
