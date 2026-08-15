@@ -15,6 +15,14 @@ import { stalenessLevel } from "@/lib/ui";
 // Passed or moved to Portfolio shouldn't keep surfacing as an open decision.
 const PASSIVE_STATUSES: Status[] = ["PASSED", "ADDED_TO_PORTFOLIO"];
 
+// Sort lives in the URL (like filters) rather than component state, so
+// re-fetching the candidate list (e.g. after "Run research") can't silently
+// reset it — that required unmounting <CandidateTable>, which owned sort as
+// local useState.
+export type SortKey = "dateScanned" | "ticker" | "score" | "gap" | "researched";
+const DEFAULT_SORT_KEY: SortKey = "dateScanned";
+const DEFAULT_SORT_ASC = false;
+
 function filtersFromParams(params: URLSearchParams): Filters {
   return {
     q: params.get("q") ?? DEFAULT_FILTERS.q,
@@ -44,18 +52,31 @@ function DashboardContent() {
   const filters = useMemo(() => filtersFromParams(searchParams), [searchParams]);
   const onlyLatestScan = searchParams.get("scan") === "latest";
   const actionableOnly = searchParams.get("quick") === "actionable";
+  const sortKey = (searchParams.get("sort") as SortKey) ?? DEFAULT_SORT_KEY;
+  const sortAsc = searchParams.get("dir") === "asc" ? true : searchParams.get("dir") === "desc" ? false : DEFAULT_SORT_ASC;
 
   const [candidates, setCandidates] = useState<CandidateWithLatest[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Distinguish the very first load (full-page "Loading…") from a refetch
+  // after mutations (e.g. Run research) — previously both used the same
+  // flag, which unmounted the table and threw away its state on every
+  // refetch, mid-interaction.
+  const [initialLoading, setInitialLoading] = useState(true);
   const [runningIds, setRunningIds] = useState<Set<string>>(new Set());
   const [liveQuotes, setLiveQuotes] = useState<Record<string, LiveQuote>>({});
+  const [loadError, setLoadError] = useState(false);
 
   const load = useCallback(async () => {
-    setLoading(true);
-    const res = await fetch("/api/candidates");
-    const data = await res.json();
-    setCandidates(data);
-    setLoading(false);
+    try {
+      const res = await fetch("/api/candidates");
+      if (!res.ok) throw new Error("Failed to load candidates");
+      const data = await res.json();
+      setCandidates(data);
+      setLoadError(false);
+    } catch {
+      setLoadError(true);
+    } finally {
+      setInitialLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -94,6 +115,8 @@ function DashboardContent() {
     const currentExtra = {
       scan: onlyLatestScan ? "latest" : null,
       quick: actionableOnly ? "actionable" : null,
+      sort: sortKey !== DEFAULT_SORT_KEY ? sortKey : null,
+      dir: sortAsc !== DEFAULT_SORT_ASC ? "asc" : null,
       ...extra,
     };
     const qs = paramsFromFilters(nextFilters, currentExtra);
@@ -102,6 +125,14 @@ function DashboardContent() {
 
   function resetFilters() {
     router.replace(pathname, { scroll: false });
+  }
+
+  function toggleSort(key: SortKey) {
+    const nextAsc = key === sortKey ? !sortAsc : false;
+    updateUrl({}, {
+      sort: key !== DEFAULT_SORT_KEY ? key : null,
+      dir: nextAsc !== DEFAULT_SORT_ASC ? "asc" : null,
+    });
   }
 
   function toggleTile(next: Record<string, string | null>) {
@@ -190,12 +221,23 @@ function DashboardContent() {
   }, [candidates, filters, onlyLatestScan, actionableOnly, latestDate]);
 
   const isFiltered =
-    JSON.stringify(filters) !== JSON.stringify(DEFAULT_FILTERS) || onlyLatestScan || actionableOnly;
+    filters.q !== DEFAULT_FILTERS.q ||
+    filters.verdict !== DEFAULT_FILTERS.verdict ||
+    filters.research !== DEFAULT_FILTERS.research ||
+    filters.minScore !== DEFAULT_FILTERS.minScore ||
+    onlyLatestScan ||
+    actionableOnly;
 
   async function handleDelete(id: string) {
-    if (!confirm("Remove this candidate?")) return;
+    const ticker = candidates.find((c) => c.id === id)?.ticker ?? "this candidate";
+    if (!confirm(`Remove ${ticker}?`)) return;
+    const previous = candidates;
     setCandidates((prev) => prev.filter((c) => c.id !== id));
-    await fetch(`/api/candidates/${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/candidates/${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      setCandidates(previous);
+      alert(`Failed to delete ${ticker} — check server logs.`);
+    }
   }
 
   async function handleRunResearch(id: string) {
@@ -220,20 +262,29 @@ function DashboardContent() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-10">
+    <main className="mx-auto w-full max-w-[1800px] px-4 py-8 sm:px-6 lg:px-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">
+          <h1 className="text-2xl font-semibold tracking-tight text-gray-900">
             Scan Candidates Dashboard
           </h1>
-          <p className="mt-1 text-sm text-gray-600">
+          <p className="mt-1 text-sm text-gray-500">
             Weekly Finviz scan output, logged by theme and scan date.
           </p>
         </div>
         <AddCandidateModal onAdded={load} />
       </div>
 
-      {!loading && candidates.length > 0 && (
+      {loadError && (
+        <div className="mt-6 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          Couldn&rsquo;t load candidates.{" "}
+          <button onClick={load} className="font-medium underline">
+            Try again
+          </button>
+        </div>
+      )}
+
+      {!initialLoading && candidates.length > 0 && (
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <DecisionTile
             label="Needs research"
@@ -277,7 +328,7 @@ function DashboardContent() {
       </div>
 
       <div className="mt-4">
-        {loading ? (
+        {initialLoading ? (
           <div className="p-10 text-center text-sm text-gray-600">Loading…</div>
         ) : (
           <CandidateTable
@@ -285,6 +336,10 @@ function DashboardContent() {
             latestDate={latestDate}
             runningIds={runningIds}
             liveQuotes={liveQuotes}
+            isFiltered={isFiltered}
+            sortKey={sortKey}
+            sortAsc={sortAsc}
+            onSort={toggleSort}
             onDelete={handleDelete}
             onRunResearch={handleRunResearch}
           />
@@ -334,7 +389,9 @@ export default function DashboardPage() {
   return (
     <Suspense
       fallback={
-        <main className="mx-auto max-w-6xl px-4 py-10 text-sm text-gray-600">Loading…</main>
+        <main className="mx-auto w-full max-w-[1800px] px-4 py-8 text-sm text-gray-600 sm:px-6 lg:px-8">
+          Loading…
+        </main>
       }
     >
       <DashboardContent />

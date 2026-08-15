@@ -84,6 +84,16 @@ export function formatDate(iso: string) {
   });
 }
 
+export function formatDateTime(iso: string) {
+  return new Date(iso).toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 export function formatPrice(value: number | null) {
   return value === null ? "insufficient data" : `$${value.toFixed(2)}`;
 }
@@ -163,10 +173,6 @@ export const RISK_SCORE_DOT_STYLES: Record<ReturnType<typeof deriveRiskLevel>, s
   high: "bg-red-500",
 };
 
-export function formatRiskScore(riskScore: number | null): string {
-  return riskScore === null ? "—" : `${riskScore}/5`;
-}
-
 // --- Entry zone (band around fair value — see valuation.ts) ---
 export function formatEntryZone(low: number | null, high: number | null): string {
   if (low === null || high === null) return "Insufficient data";
@@ -186,8 +192,8 @@ export function formatEntryDistance(
   }
   if (currentPrice < entryZoneLow) return "Below zone (deeper value)";
   if (currentPrice <= entryZoneHigh) return "✓ In entry zone";
-  const pct = Math.round(((entryZoneHigh - currentPrice) / currentPrice) * 100);
-  return `${pct}% to enter`;
+  const pct = Math.round(((currentPrice - entryZoneHigh) / currentPrice) * 100);
+  return `${pct}% above zone`;
 }
 
 // --- 52-week range position + trend ---

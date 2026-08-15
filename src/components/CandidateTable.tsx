@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 import { CandidateWithLatest, LiveQuote } from "@/lib/types";
 import { ConfidenceRead } from "@prisma/client";
-import { VALUATION_VERDICT_LABELS } from "@/lib/labels";
+import { STATUS_LABELS, VALUATION_VERDICT_LABELS } from "@/lib/labels";
 import {
   RECOMMENDATION_BORDER,
   VALUATION_VERDICT_STYLES,
@@ -14,7 +13,9 @@ import {
   qualityBarStyle,
   RISK_SCORE_DOT_STYLES,
   formatPrice,
+  formatGap,
   formatRelativeDate,
+  formatDateTime,
   stalenessLevel,
   STALENESS_TEXT_STYLES,
   VALUATION_CELL_OPACITY,
@@ -30,14 +31,17 @@ import {
 } from "@/lib/ui";
 import { computeValuationGapPct } from "@/lib/research/gap";
 import { deriveRiskLevel } from "@/lib/research/risk";
-
-type SortKey = "dateScanned" | "ticker" | "score" | "gap" | "researched";
+import type { SortKey } from "@/app/page";
 
 type Props = {
   candidates: CandidateWithLatest[];
   latestDate: string | null;
   runningIds: Set<string>;
   liveQuotes: Record<string, LiveQuote>;
+  isFiltered: boolean;
+  sortKey: SortKey;
+  sortAsc: boolean;
+  onSort: (key: SortKey) => void;
   onDelete: (id: string) => void;
   onRunResearch: (id: string) => void;
 };
@@ -50,7 +54,7 @@ function LivePriceChip({ quote }: { quote: LiveQuote | undefined }) {
 
   return (
     <div>
-      <span className="text-gray-900">{formatPrice(quote.regularMarketPrice)}</span>{" "}
+      <span className="font-semibold text-gray-900">{formatPrice(quote.regularMarketPrice)}</span>{" "}
       {quote.regularMarketChangePercent !== null && (
         <span className={`text-xs font-medium ${changeColor}`}>
           {up ? "+" : ""}
@@ -71,14 +75,6 @@ function LivePriceChip({ quote }: { quote: LiveQuote | undefined }) {
       )}
     </div>
   );
-}
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
 }
 
 const CONFIDENCE_DOT_COUNT: Record<ConfidenceRead, number> = { LOW: 1, MEDIUM: 2, HIGH: 3 };
@@ -130,12 +126,13 @@ export function CandidateTable({
   latestDate,
   runningIds,
   liveQuotes,
+  isFiltered,
+  sortKey,
+  sortAsc,
+  onSort,
   onDelete,
   onRunResearch,
 }: Props) {
-  const [sortKey, setSortKey] = useState<SortKey>("dateScanned");
-  const [sortAsc, setSortAsc] = useState(false);
-
   // Score/gap/researched are only meaningful once a candidate has been
   // researched — rows with no scorecard always sort to the bottom
   // regardless of direction, so they never scatter through a ranked list.
@@ -169,40 +166,39 @@ export function CandidateTable({
     return sortAsc ? cmp : -cmp;
   });
 
-  function toggleSort(key: SortKey) {
-    if (key === sortKey) {
-      setSortAsc(!sortAsc);
-    } else {
-      setSortKey(key);
-      setSortAsc(false);
-    }
-  }
-
   if (candidates.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-gray-300 p-10 text-center text-sm text-gray-600">
-        No candidates match these filters yet.
+        {isFiltered ? "No candidates match these filters." : "No candidates yet — add one to get started."}
       </div>
     );
   }
 
   return (
     <div className="overflow-x-auto rounded-lg border border-gray-200">
-      <table className="min-w-full divide-y divide-gray-200 text-sm">
+      <table className="w-full min-w-full divide-y divide-gray-200 text-sm">
         <thead className="bg-gray-50">
           <tr>
-            <Th onClick={() => toggleSort("ticker")}>Ticker</Th>
-            <Th onClick={() => toggleSort("score")}>Score</Th>
-            <Th onClick={() => toggleSort("gap")}>Valuation</Th>
-            <th className="px-4 py-2 text-left font-medium text-gray-600">Quality</th>
-            <th className="px-4 py-2 text-left font-medium text-gray-600">Risk</th>
-            <th className="px-4 py-2 text-left font-medium text-gray-600">Entry zone</th>
-            <th className="px-4 py-2 text-left font-medium text-gray-600">
+            <Th sortKey="ticker" activeKey={sortKey} asc={sortAsc} onSort={onSort}>
+              Ticker
+            </Th>
+            <th className="px-3 py-2.5 text-left font-medium text-gray-600">
               Price
-              <div className="text-[10px] font-normal normal-case text-gray-400">live / at research</div>
+              <div className="text-[11px] font-normal normal-case text-gray-500">live / at research</div>
             </th>
-            <Th onClick={() => toggleSort("researched")}>Researched</Th>
-            <th className="px-4 py-2" />
+            <Th sortKey="gap" activeKey={sortKey} asc={sortAsc} onSort={onSort}>
+              Intrinsic value
+            </Th>
+            <Th sortKey="score" activeKey={sortKey} asc={sortAsc} onSort={onSort}>
+              Score
+            </Th>
+            <th className="px-3 py-2.5 text-left font-medium text-gray-600">Quality</th>
+            <th className="px-3 py-2.5 text-left font-medium text-gray-600">Risk</th>
+            <th className="px-3 py-2.5 text-left font-medium text-gray-600">Entry zone</th>
+            <Th sortKey="researched" activeKey={sortKey} asc={sortAsc} onSort={onSort}>
+              Researched
+            </Th>
+            <th className="px-3 py-2.5" />
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100 bg-white">
@@ -217,23 +213,31 @@ export function CandidateTable({
 
             return (
               <tr key={c.id} className={`border-l-4 ${rowBorder} ${isNew ? "bg-blue-50/60" : ""}`}>
-                <td className="whitespace-nowrap px-4 py-2">
-                  <div className="font-semibold text-gray-900">
+                <td className="whitespace-nowrap px-3 py-2.5">
+                  <Link
+                    href={`/candidates/${c.id}`}
+                    className="rounded font-semibold text-gray-900 hover:text-blue-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+                  >
                     {c.ticker}
-                    {isNew && (
-                      <span className="ml-2 rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
-                        NEW
-                      </span>
-                    )}
+                  </Link>
+                  {isNew && (
+                    <span className="ml-2 rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                      NEW
+                    </span>
+                  )}
+                  <div className="mt-0.5">
+                    <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[11px] font-medium text-gray-600">
+                      {STATUS_LABELS[c.status]}
+                    </span>
                   </div>
                   {latest?.sector && <div className="text-xs text-gray-500">{latest.sector}</div>}
                   {latest?.marketCap !== null && latest?.marketCap !== undefined && (
-                    <div className="text-xs text-gray-400">{formatMarketCap(latest.marketCap)}</div>
+                    <div className="text-xs text-gray-500">{formatMarketCap(latest.marketCap)}</div>
                   )}
                 </td>
 
                 {c.scorecardCount === 0 ? (
-                  <td colSpan={7} className="px-4 py-2 text-gray-600">
+                  <td colSpan={7} className="px-3 py-2.5 text-gray-600">
                     <div className="flex items-center gap-3">
                       <span>Not researched yet</span>
                       <button
@@ -247,7 +251,47 @@ export function CandidateTable({
                   </td>
                 ) : (
                   <>
-                    <td className="whitespace-nowrap px-4 py-2">
+                    <td className="whitespace-nowrap px-3 py-2.5">
+                      <LivePriceChip quote={liveQuote} />
+                      <div className="text-xs text-gray-500">
+                        {formatPrice(latest.currentPrice)} at research
+                      </div>
+                      {format52WeekPosition(latest.currentPrice, latest.fiftyTwoWeekLow, latest.fiftyTwoWeekHigh) && (
+                        <div className="text-xs text-gray-500">
+                          {format52WeekPosition(latest.currentPrice, latest.fiftyTwoWeekLow, latest.fiftyTwoWeekHigh)}
+                          {formatTrend(latest.currentPrice, latest.fiftyDayAverage, latest.twoHundredDayAverage) &&
+                            ` · ${formatTrend(latest.currentPrice, latest.fiftyDayAverage, latest.twoHundredDayAverage)}`}
+                        </div>
+                      )}
+                      {formatEarningsProximity(latest.nextEarningsDate) && (
+                        <div className="text-xs font-medium text-amber-700">
+                          {formatEarningsProximity(latest.nextEarningsDate)}
+                        </div>
+                      )}
+                    </td>
+                    <td
+                      className={`whitespace-nowrap px-3 py-2.5 ${VALUATION_CELL_OPACITY[stalenessLevel(latest.createdAt)]}`}
+                      title={formatAsOfTooltip(latest.createdAt)}
+                    >
+                      <div className="font-semibold tabular-nums text-gray-900">
+                        {formatPrice(latest.fairValueEstimate)}
+                      </div>
+                      <div
+                        className={`text-xs font-medium tabular-nums ${
+                          (computeValuationGapPct(latest.currentPrice, latest.fairValueEstimate) ?? 0) >= 0
+                            ? "text-green-700"
+                            : "text-red-700"
+                        }`}
+                      >
+                        {formatGap(latest.currentPrice, latest.fairValueEstimate)}
+                      </div>
+                      <span
+                        className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[11px] font-medium ${VALUATION_VERDICT_STYLES[latest.valuationVerdict]}`}
+                      >
+                        {VALUATION_VERDICT_LABELS[latest.valuationVerdict]}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2.5">
                       <div
                         className={`inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 font-bold ${scoreStyles(latest.recommendationScore)}`}
                       >
@@ -256,7 +300,7 @@ export function CandidateTable({
                       <div className="mt-1 h-1 w-16 rounded-full bg-gray-200">
                         <div
                           className={`h-1 rounded-full ${scoreBarStyle(latest.recommendationScore)}`}
-                          style={{ width: `${latest.recommendationScore ?? 0}%` }}
+                          style={{ width: `${Math.min(100, Math.max(0, latest.recommendationScore ?? 0))}%` }}
                         />
                       </div>
                       <DeltaChip
@@ -264,28 +308,7 @@ export function CandidateTable({
                         previous={previous?.recommendationScore ?? null}
                       />
                     </td>
-                    <td
-                      className={`whitespace-nowrap px-4 py-2 ${VALUATION_CELL_OPACITY[stalenessLevel(latest.createdAt)]}`}
-                      title={formatAsOfTooltip(latest.createdAt)}
-                    >
-                      <div
-                        className={`inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 font-bold ${scoreStyles(latest.valuationScore)}`}
-                      >
-                        {latest.valuationScore ?? "—"}
-                      </div>
-                      <div className="mt-1 h-1 w-16 rounded-full bg-gray-200">
-                        <div
-                          className={`h-1 rounded-full ${scoreBarStyle(latest.valuationScore)}`}
-                          style={{ width: `${latest.valuationScore ?? 0}%` }}
-                        />
-                      </div>
-                      <span
-                        className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${VALUATION_VERDICT_STYLES[latest.valuationVerdict]}`}
-                      >
-                        {VALUATION_VERDICT_LABELS[latest.valuationVerdict]}
-                      </span>
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-2">
+                    <td className="whitespace-nowrap px-3 py-2.5">
                       <div
                         className={`inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 font-bold ${qualityStyles(latest.qualityScore)}`}
                       >
@@ -294,17 +317,17 @@ export function CandidateTable({
                       <div className="mt-1 h-1 w-16 rounded-full bg-gray-200">
                         <div
                           className={`h-1 rounded-full ${qualityBarStyle(latest.qualityScore)}`}
-                          style={{ width: `${latest.qualityScore ?? 0}%` }}
+                          style={{ width: `${Math.min(100, Math.max(0, latest.qualityScore ?? 0))}%` }}
                         />
                       </div>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-2">
+                    <td className="whitespace-nowrap px-3 py-2.5">
                       <RiskDots riskScore={latest.riskScore} />
                       <div className="mt-1">
                         <ConfidenceDots confidence={latest.confidenceRead} />
                       </div>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-2">
+                    <td className="whitespace-nowrap px-3 py-2.5">
                       <div className="text-gray-900">
                         {formatEntryZone(latest.entryZoneLow, latest.entryZoneHigh)}
                       </div>
@@ -324,58 +347,44 @@ export function CandidateTable({
                         </span>
                       )}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-2">
-                      <LivePriceChip quote={liveQuote} />
-                      <div className="text-xs text-gray-500">
-                        {formatPrice(latest.currentPrice)} at research
-                      </div>
-                      {format52WeekPosition(latest.currentPrice, latest.fiftyTwoWeekLow, latest.fiftyTwoWeekHigh) && (
-                        <div className="text-xs text-gray-400">
-                          {format52WeekPosition(latest.currentPrice, latest.fiftyTwoWeekLow, latest.fiftyTwoWeekHigh)}
-                          {formatTrend(latest.currentPrice, latest.fiftyDayAverage, latest.twoHundredDayAverage) &&
-                            ` · ${formatTrend(latest.currentPrice, latest.fiftyDayAverage, latest.twoHundredDayAverage)}`}
-                        </div>
-                      )}
-                      {formatEarningsProximity(latest.nextEarningsDate) && (
-                        <div className="text-xs font-medium text-amber-700">
-                          {formatEarningsProximity(latest.nextEarningsDate)}
-                        </div>
-                      )}
-                    </td>
-                    <td
-                      className={`whitespace-nowrap px-4 py-2 ${STALENESS_TEXT_STYLES[stalenessLevel(latest.createdAt)]}`}
-                      title={`Last researched ${formatDate(latest.createdAt)}`}
-                    >
-                      {formatRelativeDate(latest.createdAt)}
+                    <td className="whitespace-nowrap px-3 py-2.5">
+                      <time
+                        dateTime={latest.createdAt}
+                        className={`block font-medium ${STALENESS_TEXT_STYLES[stalenessLevel(latest.createdAt)]}`}
+                      >
+                        {formatRelativeDate(latest.createdAt)}
+                      </time>
+                      <span className="block text-[11px] text-gray-500">
+                        {formatDateTime(latest.createdAt)}
+                      </span>
                     </td>
                   </>
                 )}
 
-                <td className="whitespace-nowrap px-4 py-2 text-right">
-                  {c.scorecardCount > 0 && (
-                    <button
-                      onClick={() => onRunResearch(c.id)}
-                      disabled={running}
-                      className="text-blue-600 hover:underline disabled:opacity-50"
+                <td className="whitespace-nowrap px-3 py-2.5 text-right">
+                  <div className="flex items-center justify-end gap-3">
+                    {c.scorecardCount > 0 && (
+                      <button
+                        onClick={() => onRunResearch(c.id)}
+                        disabled={running}
+                        className="text-blue-600 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50"
+                      >
+                        {running ? "Running…" : "Re-research"}
+                      </button>
+                    )}
+                    <Link
+                      href={`/candidates/${c.id}/edit`}
+                      className="text-gray-600 hover:text-gray-900 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
                     >
-                      {running ? "Running…" : "Re-research"}
+                      Edit
+                    </Link>
+                    <button
+                      onClick={() => onDelete(c.id)}
+                      className="text-gray-400 hover:text-red-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+                    >
+                      Delete
                     </button>
-                  )}
-                  <Link href={`/candidates/${c.id}`} className="ml-3 text-blue-600 hover:underline">
-                    Detail
-                  </Link>
-                  <Link
-                    href={`/candidates/${c.id}/edit`}
-                    className="ml-3 text-blue-600 hover:underline"
-                  >
-                    Edit
-                  </Link>
-                  <button
-                    onClick={() => onDelete(c.id)}
-                    className="ml-3 text-gray-500 hover:text-red-600"
-                  >
-                    Delete
-                  </button>
+                  </div>
                 </td>
               </tr>
             );
@@ -386,13 +395,37 @@ export function CandidateTable({
   );
 }
 
-function Th({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
+function Th({
+  children,
+  sortKey,
+  activeKey,
+  asc,
+  onSort,
+}: {
+  children: React.ReactNode;
+  sortKey: SortKey;
+  activeKey: SortKey;
+  asc: boolean;
+  onSort: (key: SortKey) => void;
+}) {
+  const active = sortKey === activeKey;
+  const indicator = active ? (asc ? "↑" : "↓") : "↕";
   return (
     <th
-      className="cursor-pointer select-none whitespace-nowrap px-4 py-2 text-left font-medium text-gray-600 hover:text-gray-900"
-      onClick={onClick}
+      scope="col"
+      className="px-3 py-2.5 text-left font-medium text-gray-600"
+      aria-sort={active ? (asc ? "ascending" : "descending") : "none"}
     >
-      {children} ↕
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className={`flex items-center gap-1 whitespace-nowrap rounded hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${
+          active ? "font-semibold text-gray-900" : ""
+        }`}
+      >
+        {children}
+        <span aria-hidden="true">{indicator}</span>
+      </button>
     </th>
   );
 }

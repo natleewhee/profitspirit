@@ -49,7 +49,7 @@ export function FilterBar({ filters, onChange, onReset, isFiltered }: Props) {
           <option value="ALL">All</option>
           <option value="NEEDS">Needs research</option>
           <option value="RESEARCHED">Researched</option>
-          <option value="STALE">Stale (&gt;30d)</option>
+          <option value="STALE">Stale (&gt;60d)</option>
         </select>
       </label>
 

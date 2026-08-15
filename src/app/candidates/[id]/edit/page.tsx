@@ -14,7 +14,7 @@ export default async function EditCandidatePage({
   if (!candidate) notFound();
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-10">
+    <main className="mx-auto max-w-4xl px-4 py-10">
       <Link href="/" className="text-sm text-blue-600 hover:underline">
         ← Back to dashboard
       </Link>
