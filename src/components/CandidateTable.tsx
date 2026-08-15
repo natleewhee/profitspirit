@@ -1,18 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { CandidateWithLatest, LiveQuote } from "@/lib/types";
-import { ConfidenceRead } from "@prisma/client";
-import { STATUS_LABELS, VALUATION_VERDICT_LABELS } from "@/lib/labels";
+import { STATUS_LABELS, VALUATION_VERDICT_LABELS, RECOMMENDATION_LABELS, RISK_LEVEL_LABELS } from "@/lib/labels";
 import {
   RECOMMENDATION_BORDER,
   VALUATION_VERDICT_STYLES,
+  RISK_LEVEL_STYLES,
   scoreStyles,
   scoreBarStyle,
-  qualityStyles,
-  qualityBarStyle,
-  RISK_SCORE_DOT_STYLES,
   formatPrice,
   formatGap,
   formatRelativeDate,
@@ -27,12 +24,11 @@ import {
   formatTrend,
   formatMarketCap,
   formatEarningsProximity,
-  formatCouncilConsensus,
-  councilConsensusStyles,
   RUNNING_RESEARCH_LABEL,
 } from "@/lib/ui";
 import { computeValuationGapPct } from "@/lib/research/gap";
-import { deriveRiskLevel } from "@/lib/research/risk";
+import { CandidateDetailBody } from "./CandidateDetailBody";
+import { RefreshIcon, PencilIcon, TrashIcon, ChevronDownIcon } from "./icons";
 import type { SortKey } from "@/app/page";
 
 type Props = {
@@ -80,37 +76,6 @@ function LivePriceChip({ quote }: { quote: LiveQuote | undefined }) {
   );
 }
 
-const CONFIDENCE_DOT_COUNT: Record<ConfidenceRead, number> = { LOW: 1, MEDIUM: 2, HIGH: 3 };
-
-function ConfidenceDots({ confidence }: { confidence: ConfidenceRead }) {
-  const filled = CONFIDENCE_DOT_COUNT[confidence];
-  return (
-    <span className="inline-flex items-center gap-0.5" title={`${confidence} confidence`}>
-      {[1, 2, 3].map((i) => (
-        <span
-          key={i}
-          className={`h-1.5 w-1.5 rounded-full ${i <= filled ? "bg-gray-700 dark:bg-gray-300" : "bg-gray-300 dark:bg-gray-600"}`}
-        />
-      ))}
-    </span>
-  );
-}
-
-function RiskDots({ riskScore }: { riskScore: number | null }) {
-  const level = deriveRiskLevel(riskScore);
-  const filled = riskScore ?? 0;
-  return (
-    <span className="inline-flex items-center gap-0.5" title={`Risk ${riskScore ?? "—"}/5`}>
-      {[1, 2, 3, 4, 5].map((i) => (
-        <span
-          key={i}
-          className={`h-1.5 w-1.5 rounded-full ${i <= filled ? RISK_SCORE_DOT_STYLES[level] : "bg-gray-300 dark:bg-gray-600"}`}
-        />
-      ))}
-    </span>
-  );
-}
-
 function DeltaChip({ latest, previous }: { latest: number | null; previous: number | null }) {
   if (latest === null || previous === null) return null;
   const diff = latest - previous;
@@ -123,6 +88,8 @@ function DeltaChip({ latest, previous }: { latest: number | null; previous: numb
     </span>
   );
 }
+
+const ICON_BUTTON = "rounded p-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-40 disabled:pointer-events-none";
 
 export function CandidateTable({
   candidates,
@@ -176,6 +143,13 @@ export function CandidateTable({
     [candidates, sortKey, sortAsc]
   );
 
+  // Click-to-expand detail row — the same breakdown the desktop hover panel
+  // shows, reached by tap instead of hover so touch/mobile isn't stuck with
+  // a permanently-hidden Quality/Risk/Confidence/PE breakdown now that
+  // those no longer have dedicated columns. Local state (not lifted) —
+  // transient UI, doesn't need to survive a remount.
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
   if (candidates.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-gray-300 p-10 text-center text-sm text-gray-600 dark:border-gray-700 dark:text-gray-400">
@@ -200,10 +174,8 @@ export function CandidateTable({
               Intrinsic value
             </Th>
             <Th sortKey="score" activeKey={sortKey} asc={sortAsc} onSort={onSort}>
-              Score
+              Recommendation
             </Th>
-            <th className="px-3 py-2.5 text-left font-medium text-gray-600 dark:text-gray-400">Quality</th>
-            <th className="px-3 py-2.5 text-left font-medium text-gray-600 dark:text-gray-400">Risk</th>
             <th className="px-3 py-2.5 text-left font-medium text-gray-600 dark:text-gray-400">Entry zone</th>
             <Th sortKey="researched" activeKey={sortKey} asc={sortAsc} onSort={onSort}>
               Researched
@@ -218,192 +190,199 @@ export function CandidateTable({
             const previous = c.scorecards[1];
             const running = runningIds.has(c.id);
             const liveQuote = liveQuotes[c.ticker];
+            const expanded = expandedId === c.id;
 
             const rowBorder = latest ? RECOMMENDATION_BORDER[latest.recommendation] : "border-l-gray-200 dark:border-l-gray-700";
 
             return (
-              <tr
-                key={c.id}
-                onMouseEnter={() => onHover?.(c.id)}
-                className={`border-l-4 ${rowBorder} ${isNew ? "bg-blue-50/60 dark:bg-blue-500/10" : ""}`}
-              >
-                <td className="whitespace-nowrap px-3 py-2.5">
-                  <Link
-                    href={`/candidates/${c.id}`}
-                    className="rounded font-semibold text-gray-900 dark:text-gray-100 hover:text-blue-700 dark:hover:text-blue-400 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
-                  >
-                    {c.ticker}
-                  </Link>
-                  {isNew && (
-                    <span className="ml-2 rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
-                      NEW
-                    </span>
-                  )}
-                  <div className="mt-0.5">
-                    <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[11px] font-medium text-gray-600 dark:bg-gray-500/15 dark:text-gray-300">
-                      {STATUS_LABELS[c.status]}
-                    </span>
-                  </div>
-                  {latest?.sector && <div className="text-xs text-gray-500">{latest.sector}</div>}
-                  {latest?.marketCap !== null && latest?.marketCap !== undefined && (
-                    <div className="text-xs text-gray-500">{formatMarketCap(latest.marketCap)}</div>
-                  )}
-                </td>
+              <Fragment key={c.id}>
+                <tr
+                  onMouseEnter={() => onHover?.(c.id)}
+                  className={`border-l-4 ${rowBorder} ${isNew ? "bg-blue-50/60 dark:bg-blue-500/10" : ""}`}
+                >
+                  <td className="whitespace-nowrap px-3 py-2.5">
+                    <Link
+                      href={`/candidates/${c.id}`}
+                      className="rounded font-semibold text-gray-900 dark:text-gray-100 hover:text-blue-700 dark:hover:text-blue-400 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+                    >
+                      {c.ticker}
+                    </Link>
+                    {isNew && (
+                      <span className="ml-2 rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                        NEW
+                      </span>
+                    )}
+                    <div className="mt-0.5">
+                      <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[11px] font-medium text-gray-600 dark:bg-gray-500/15 dark:text-gray-300">
+                        {STATUS_LABELS[c.status]}
+                      </span>
+                    </div>
+                    {latest?.sector && <div className="text-xs text-gray-500">{latest.sector}</div>}
+                    {latest?.marketCap !== null && latest?.marketCap !== undefined && (
+                      <div className="text-xs text-gray-500">{formatMarketCap(latest.marketCap)}</div>
+                    )}
+                  </td>
 
-                {c.scorecardCount === 0 ? (
-                  <td colSpan={7} className="px-3 py-2.5 text-gray-600 dark:text-gray-400">
-                    <div className="flex items-center gap-3">
-                      <span>Not researched yet</span>
-                      <button
-                        onClick={() => onRunResearch(c.id)}
-                        disabled={running}
-                        className="rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                  {c.scorecardCount === 0 ? (
+                    <td colSpan={5} className="px-3 py-2.5 text-gray-600 dark:text-gray-400">
+                      <div className="flex items-center gap-3">
+                        <span>Not researched yet</span>
+                        <button
+                          onClick={() => onRunResearch(c.id)}
+                          disabled={running}
+                          className="rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                        >
+                          {running ? RUNNING_RESEARCH_LABEL : "Run research"}
+                        </button>
+                      </div>
+                    </td>
+                  ) : (
+                    <>
+                      <td className="whitespace-nowrap px-3 py-2.5">
+                        <LivePriceChip quote={liveQuote} />
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          {formatPrice(latest.currentPrice)} at research
+                        </div>
+                        {format52WeekPosition(latest.currentPrice, latest.fiftyTwoWeekLow, latest.fiftyTwoWeekHigh) && (
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            {format52WeekPosition(latest.currentPrice, latest.fiftyTwoWeekLow, latest.fiftyTwoWeekHigh)}
+                            {formatTrend(latest.currentPrice, latest.fiftyDayAverage, latest.twoHundredDayAverage) &&
+                              ` · ${formatTrend(latest.currentPrice, latest.fiftyDayAverage, latest.twoHundredDayAverage)}`}
+                          </div>
+                        )}
+                        {formatEarningsProximity(latest.nextEarningsDate) && (
+                          <div className="text-xs font-medium text-amber-700 dark:text-amber-400">
+                            {formatEarningsProximity(latest.nextEarningsDate)}
+                          </div>
+                        )}
+                      </td>
+                      <td
+                        className={`whitespace-nowrap px-3 py-2.5 ${VALUATION_CELL_OPACITY[stalenessLevel(latest.createdAt)]}`}
+                        title={formatAsOfTooltip(latest.createdAt)}
                       >
-                        {running ? RUNNING_RESEARCH_LABEL : "Run research"}
+                        <div className="font-semibold tabular-nums text-gray-900 dark:text-gray-100">
+                          {formatPrice(latest.fairValueEstimate)}
+                        </div>
+                        <div
+                          className={`text-xs font-medium tabular-nums ${
+                            (computeValuationGapPct(latest.currentPrice, latest.fairValueEstimate) ?? 0) >= 0
+                              ? "text-green-700 dark:text-green-400"
+                              : "text-red-700 dark:text-red-400"
+                          }`}
+                        >
+                          {formatGap(latest.currentPrice, latest.fairValueEstimate)}
+                        </div>
+                        <span
+                          className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[11px] font-medium ${VALUATION_VERDICT_STYLES[latest.valuationVerdict]}`}
+                        >
+                          {VALUATION_VERDICT_LABELS[latest.valuationVerdict]}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2.5">
+                        <div
+                          className={`inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 font-bold ${scoreStyles(latest.recommendationScore)}`}
+                        >
+                          {latest.recommendationScore ?? "—"}
+                        </div>
+                        <div className="text-xs text-gray-600 dark:text-gray-400">
+                          {RECOMMENDATION_LABELS[latest.recommendation]}
+                        </div>
+                        <div className="mt-1 h-1 w-16 rounded-full bg-gray-200 dark:bg-gray-700">
+                          <div
+                            className={`h-1 rounded-full ${scoreBarStyle(latest.recommendationScore)}`}
+                            style={{ width: `${Math.min(100, Math.max(0, latest.recommendationScore ?? 0))}%` }}
+                          />
+                        </div>
+                        <DeltaChip
+                          latest={latest.recommendationScore}
+                          previous={previous?.recommendationScore ?? null}
+                        />
+                        <span
+                          className={`mt-1 inline-block rounded-full px-1.5 py-0.5 text-[10px] font-medium ${RISK_LEVEL_STYLES[latest.riskLevel]}`}
+                        >
+                          {RISK_LEVEL_LABELS[latest.riskLevel]}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2.5">
+                        <div className="text-gray-900 dark:text-gray-100">
+                          {formatEntryZone(latest.entryZoneLow, latest.entryZoneHigh)}
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          {formatEntryDistance(
+                            liveQuote?.regularMarketPrice ?? latest.currentPrice,
+                            latest.entryZoneLow,
+                            latest.entryZoneHigh
+                          )}
+                        </div>
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2.5">
+                        <time
+                          dateTime={latest.createdAt}
+                          className={`block font-medium ${STALENESS_TEXT_STYLES[stalenessLevel(latest.createdAt)]}`}
+                        >
+                          {formatRelativeDate(latest.createdAt)}
+                        </time>
+                        <span className="block text-[11px] text-gray-500 dark:text-gray-400">
+                          {formatDateTime(latest.createdAt)}
+                        </span>
+                      </td>
+                    </>
+                  )}
+
+                  <td className="whitespace-nowrap px-3 py-2.5 text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      {latest && (
+                        <button
+                          onClick={() => setExpandedId(expanded ? null : c.id)}
+                          aria-expanded={expanded}
+                          aria-label={expanded ? "Hide details" : "Show details"}
+                          title={expanded ? "Hide details" : "Show details"}
+                          className={`${ICON_BUTTON} text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100`}
+                        >
+                          <ChevronDownIcon className={`h-4 w-4 transition-transform ${expanded ? "rotate-180" : ""}`} />
+                        </button>
+                      )}
+                      {c.scorecardCount > 0 && (
+                        <button
+                          onClick={() => onRunResearch(c.id)}
+                          disabled={running}
+                          aria-label={running ? RUNNING_RESEARCH_LABEL : "Re-research"}
+                          title={running ? RUNNING_RESEARCH_LABEL : "Re-research"}
+                          className={`${ICON_BUTTON} text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300`}
+                        >
+                          <RefreshIcon className={`h-4 w-4 ${running ? "animate-spin" : ""}`} />
+                        </button>
+                      )}
+                      <Link
+                        href={`/candidates/${c.id}/edit`}
+                        aria-disabled={running}
+                        aria-label="Edit"
+                        title="Edit"
+                        onClick={(e) => running && e.preventDefault()}
+                        className={`${ICON_BUTTON} text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 aria-disabled:pointer-events-none aria-disabled:opacity-40`}
+                      >
+                        <PencilIcon className="h-4 w-4" />
+                      </Link>
+                      <button
+                        onClick={() => onDelete(c.id)}
+                        disabled={running}
+                        aria-label="Delete"
+                        title="Delete"
+                        className={`${ICON_BUTTON} text-gray-400 hover:text-red-600 dark:text-gray-500 dark:hover:text-red-400`}
+                      >
+                        <TrashIcon className="h-4 w-4" />
                       </button>
                     </div>
                   </td>
-                ) : (
-                  <>
-                    <td className="whitespace-nowrap px-3 py-2.5">
-                      <LivePriceChip quote={liveQuote} />
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                        {formatPrice(latest.currentPrice)} at research
-                      </div>
-                      {format52WeekPosition(latest.currentPrice, latest.fiftyTwoWeekLow, latest.fiftyTwoWeekHigh) && (
-                        <div className="text-xs text-gray-500 dark:text-gray-400">
-                          {format52WeekPosition(latest.currentPrice, latest.fiftyTwoWeekLow, latest.fiftyTwoWeekHigh)}
-                          {formatTrend(latest.currentPrice, latest.fiftyDayAverage, latest.twoHundredDayAverage) &&
-                            ` · ${formatTrend(latest.currentPrice, latest.fiftyDayAverage, latest.twoHundredDayAverage)}`}
-                        </div>
-                      )}
-                      {formatEarningsProximity(latest.nextEarningsDate) && (
-                        <div className="text-xs font-medium text-amber-700 dark:text-amber-400">
-                          {formatEarningsProximity(latest.nextEarningsDate)}
-                        </div>
-                      )}
+                </tr>
+                {expanded && latest && (
+                  <tr className={`border-l-4 ${rowBorder}`}>
+                    <td colSpan={7} className="bg-gray-50/60 px-4 py-4 dark:bg-gray-800/30">
+                      <CandidateDetailBody latest={latest} />
                     </td>
-                    <td
-                      className={`whitespace-nowrap px-3 py-2.5 ${VALUATION_CELL_OPACITY[stalenessLevel(latest.createdAt)]}`}
-                      title={formatAsOfTooltip(latest.createdAt)}
-                    >
-                      <div className="font-semibold tabular-nums text-gray-900 dark:text-gray-100">
-                        {formatPrice(latest.fairValueEstimate)}
-                      </div>
-                      <div
-                        className={`text-xs font-medium tabular-nums ${
-                          (computeValuationGapPct(latest.currentPrice, latest.fairValueEstimate) ?? 0) >= 0
-                            ? "text-green-700 dark:text-green-400"
-                            : "text-red-700 dark:text-red-400"
-                        }`}
-                      >
-                        {formatGap(latest.currentPrice, latest.fairValueEstimate)}
-                      </div>
-                      <span
-                        className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[11px] font-medium ${VALUATION_VERDICT_STYLES[latest.valuationVerdict]}`}
-                      >
-                        {VALUATION_VERDICT_LABELS[latest.valuationVerdict]}
-                      </span>
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2.5">
-                      <div
-                        className={`inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 font-bold ${scoreStyles(latest.recommendationScore)}`}
-                      >
-                        {latest.recommendationScore ?? "—"}
-                      </div>
-                      <div className="mt-1 h-1 w-16 rounded-full bg-gray-200 dark:bg-gray-700">
-                        <div
-                          className={`h-1 rounded-full ${scoreBarStyle(latest.recommendationScore)}`}
-                          style={{ width: `${Math.min(100, Math.max(0, latest.recommendationScore ?? 0))}%` }}
-                        />
-                      </div>
-                      <DeltaChip
-                        latest={latest.recommendationScore}
-                        previous={previous?.recommendationScore ?? null}
-                      />
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2.5">
-                      <div
-                        className={`inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 font-bold ${qualityStyles(latest.qualityScore)}`}
-                      >
-                        {latest.qualityScore ?? "—"}
-                      </div>
-                      <div className="mt-1 h-1 w-16 rounded-full bg-gray-200 dark:bg-gray-700">
-                        <div
-                          className={`h-1 rounded-full ${qualityBarStyle(latest.qualityScore)}`}
-                          style={{ width: `${Math.min(100, Math.max(0, latest.qualityScore ?? 0))}%` }}
-                        />
-                      </div>
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2.5">
-                      <RiskDots riskScore={latest.riskScore} />
-                      <div className="mt-1">
-                        <ConfidenceDots confidence={latest.confidenceRead} />
-                      </div>
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2.5">
-                      <div className="text-gray-900 dark:text-gray-100">
-                        {formatEntryZone(latest.entryZoneLow, latest.entryZoneHigh)}
-                      </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                        {formatEntryDistance(
-                          liveQuote?.regularMarketPrice ?? latest.currentPrice,
-                          latest.entryZoneLow,
-                          latest.entryZoneHigh
-                        )}
-                      </div>
-                      {latest.councilConsensus !== null && (
-                        <span
-                          className={`mt-1 inline-block rounded-full px-1.5 py-0.5 text-[10px] font-bold ${councilConsensusStyles(latest.councilConsensus)}`}
-                          title="Council of 5 — how many favor entering"
-                        >
-                          {formatCouncilConsensus(latest.councilConsensus)} council
-                        </span>
-                      )}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2.5">
-                      <time
-                        dateTime={latest.createdAt}
-                        className={`block font-medium ${STALENESS_TEXT_STYLES[stalenessLevel(latest.createdAt)]}`}
-                      >
-                        {formatRelativeDate(latest.createdAt)}
-                      </time>
-                      <span className="block text-[11px] text-gray-500 dark:text-gray-400">
-                        {formatDateTime(latest.createdAt)}
-                      </span>
-                    </td>
-                  </>
+                  </tr>
                 )}
-
-                <td className="whitespace-nowrap px-3 py-2.5 text-right">
-                  <div className="flex items-center justify-end gap-3">
-                    {c.scorecardCount > 0 && (
-                      <button
-                        onClick={() => onRunResearch(c.id)}
-                        disabled={running}
-                        className="text-blue-600 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50"
-                      >
-                        {running ? RUNNING_RESEARCH_LABEL : "Re-research"}
-                      </button>
-                    )}
-                    <Link
-                      href={`/candidates/${c.id}/edit`}
-                      aria-disabled={running}
-                      onClick={(e) => running && e.preventDefault()}
-                      className="text-gray-600 hover:text-gray-900 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 aria-disabled:pointer-events-none aria-disabled:opacity-50 dark:text-gray-400 dark:hover:text-gray-100"
-                    >
-                      Edit
-                    </Link>
-                    <button
-                      onClick={() => onDelete(c.id)}
-                      disabled={running}
-                      className="text-gray-400 hover:text-red-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50 dark:text-gray-500 dark:hover:text-red-400"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </td>
-              </tr>
+              </Fragment>
             );
           })}
         </tbody>

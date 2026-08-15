@@ -1,6 +1,6 @@
 import { CouncilVerdict } from "@/lib/types";
 import { PERSONA_LABELS } from "@/lib/research/council";
-import { formatCouncilConsensus, councilConsensusStyles } from "@/lib/ui";
+import { formatCouncilConsensus, councilConsensusStyles, councilLeaning } from "@/lib/ui";
 
 const VERDICT_STYLES: Record<CouncilVerdict["verdict"], string> = {
   enter: "bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300",
@@ -22,6 +22,9 @@ type Props = {
 // Five well-known fundamental-analysis lenses reacting to this scorecard's
 // already-computed numbers — not five independent re-analyses. See
 // src/lib/research/council.ts for why no persona gets its own price target.
+// Collapsed to one line by default (<details>, same pattern as "Scan
+// context" on this page) — real signal, but 5 full cards competing with the
+// hero and stat strip for attention isn't a default worth keeping.
 export function CouncilSection({ verdicts, consensus }: Props) {
   if (!verdicts || verdicts.length === 0) {
     return (
@@ -32,15 +35,13 @@ export function CouncilSection({ verdicts, consensus }: Props) {
   }
 
   return (
-    <div>
-      <div className="flex items-center gap-2">
-        <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Council of 5</h2>
-        <span
-          className={`rounded-full px-2 py-0.5 text-xs font-bold ${councilConsensusStyles(consensus)}`}
-        >
+    <details className="rounded-lg border border-gray-200 px-3 py-2 dark:border-gray-800">
+      <summary className="cursor-pointer text-sm text-gray-700 dark:text-gray-300">
+        Council {consensus !== null && councilLeaning(consensus)} —{" "}
+        <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${councilConsensusStyles(consensus)}`}>
           {formatCouncilConsensus(consensus)} favor entering
         </span>
-      </div>
+      </summary>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         {verdicts.map((v) => (
           <div key={v.name} className="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
@@ -60,6 +61,6 @@ export function CouncilSection({ verdicts, consensus }: Props) {
           </div>
         ))}
       </div>
-    </div>
+    </details>
   );
 }

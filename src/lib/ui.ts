@@ -238,6 +238,16 @@ export function formatCouncilConsensus(consensus: number | null): string {
   return consensus === null ? "—" : `${consensus}/5`;
 }
 
+// One-line lean phrase for the council's tally — used to collapse the full
+// 5-persona breakdown to a single line by default (see
+// docs/dashboard-ux-review.md; Council of 5 is real signal but shouldn't be
+// on by default in the table or take up the whole detail page).
+export function councilLeaning(consensus: number): string {
+  if (consensus >= 3) return "leans toward entering";
+  if (consensus === 2) return "is split";
+  return "leans against entering";
+}
+
 export function councilConsensusStyles(consensus: number | null): string {
   if (consensus === null) return "bg-gray-200 text-gray-700 dark:bg-gray-500/15 dark:text-gray-300";
   if (consensus >= 3) return "bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300";
