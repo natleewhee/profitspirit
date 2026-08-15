@@ -2,7 +2,6 @@ import Groq from "groq-sdk";
 import type { FundamentalsBundle } from "./fundamentalsData";
 import type { MarketDataBundle } from "./marketData";
 import { ScorecardSchema, type Scorecard } from "./scorecard";
-import { PERSONAS, PERSONA_BRIEF, CouncilResponseSchema, type CouncilVerdict } from "./council";
 
 // Lazy singleton: constructing Groq() throws immediately if GROQ_API_KEY is
 // unset, which would otherwise crash `next build` (it imports this module to
@@ -187,97 +186,4 @@ export async function runSynthesizer(params: {
   const stripped = raw.trim().replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
 
   return ScorecardSchema.parse(JSON.parse(stripped));
-}
-
-const COUNCIL_JSON_SCHEMA = {
-  type: "object",
-  properties: {
-    verdicts: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          name: { type: "string", enum: PERSONAS },
-          verdict: { type: "string", enum: ["enter", "wait", "avoid"] },
-          reasoning: { type: "string" },
-        },
-        required: ["name", "verdict", "reasoning"],
-      },
-      minItems: 5,
-      maxItems: 5,
-    },
-  },
-  required: ["verdicts"],
-};
-
-// 3.4 Council — five well-known fundamental-analysis lenses (see council.ts)
-// reacting to the numbers already computed by this run, not doing fresh
-// independent research. Runs AFTER valuation/score/quality/risk are
-// computed (unlike the Synthesizer) because it needs the actual entry zone
-// to react to — there is exactly one entry zone in this app, and no
-// persona gets to propose a different one.
-export async function runCouncil(params: {
-  ticker: string;
-  bullCase: string;
-  bearCase: string;
-  riskFlags: string[];
-  numbers: {
-    recommendationScore: number | null;
-    valuationScore: number | null;
-    qualityScore: number | null;
-    riskScore: number | null;
-    entryZoneLow: number | null;
-    entryZoneHigh: number | null;
-    currentPrice: number | null;
-    pegRatio: number | null;
-    marginOfSafetyMet: boolean | null;
-  };
-}): Promise<CouncilVerdict[]> {
-  const personaBriefs = PERSONAS.map((p) => `- ${p}: ${PERSONA_BRIEF[p]}`).join("\n");
-
-  const completion = await getClient().chat.completions.create({
-    model: MODEL,
-    max_tokens: 1200,
-    response_format: { type: "json_object" },
-    messages: [
-      {
-        role: "system",
-        content:
-          "You produce five short reactions to a stock, one per well-known investor persona. " +
-          "You are NOT doing independent research and you do NOT propose your own price or entry " +
-          "zone — there is exactly one entry zone, given to you below, and every persona reacts to " +
-          "that same zone. Each persona's reasoning must be 1-2 sentences and must cite at least " +
-          "one specific number you were given (e.g. 'PEG of 0.8', 'risk score 4/5', 'price is " +
-          "$12 above the entry zone'). Do not invent data beyond what's given.\n\n" +
-          "Persona focus areas:\n" +
-          personaBriefs +
-          "\n\nRespond with ONLY a single JSON object, no markdown fences, no other text, " +
-          "matching exactly this shape:\n" +
-          JSON.stringify(COUNCIL_JSON_SCHEMA, null, 2),
-      },
-      {
-        role: "user",
-        content:
-          `Ticker: ${params.ticker}\n\nBull case:\n${params.bullCase}\n\nBear case:\n${params.bearCase}\n\n` +
-          `Risk flags: ${JSON.stringify(params.riskFlags)}\n\n` +
-          `Computed numbers:\n${JSON.stringify(params.numbers, null, 2)}`,
-      },
-    ],
-  });
-
-  const raw = completion.choices[0]?.message?.content;
-  if (!raw) {
-    throw new Error(`Council returned no content for ${params.ticker}`);
-  }
-
-  const stripped = raw.trim().replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
-  const parsed = JSON.parse(stripped);
-  // json_object mode guarantees valid JSON, not our exact shape — the model
-  // occasionally returns `verdicts` as an object keyed by persona name
-  // instead of an array. Recover rather than rejecting outright; a genuinely
-  // malformed response still fails the schema.parse below.
-  if (parsed && typeof parsed.verdicts === "object" && !Array.isArray(parsed.verdicts)) {
-    parsed.verdicts = Object.values(parsed.verdicts);
-  }
-  return CouncilResponseSchema.parse(parsed).verdicts;
 }

@@ -7,8 +7,6 @@ import {
   RiskLevel,
   ValuationVerdict,
 } from "@prisma/client";
-export type { CouncilVerdict } from "@/lib/research/council";
-import type { CouncilVerdict } from "@/lib/research/council";
 
 export type Candidate = {
   id: string;
@@ -54,9 +52,6 @@ export type Scorecard = {
   fiftyDayAverage: number | null;
   twoHundredDayAverage: number | null;
   nextEarningsDate: string | null;
-  pegRatio: number | null;
-  councilVerdicts: CouncilVerdict[] | null;
-  councilConsensus: number | null;
   trailingPE: number | null;
   forwardPE: number | null;
   earningsGrowth: number | null;
@@ -99,8 +94,6 @@ export type ScorecardSummary = Pick<
   | "fiftyDayAverage"
   | "twoHundredDayAverage"
   | "nextEarningsDate"
-  | "pegRatio"
-  | "councilConsensus"
   | "trailingPE"
   | "forwardPE"
   | "earningsGrowth"

@@ -7,8 +7,6 @@ import {
   formatPrice,
   RISK_LEVEL_STYLES,
   CONFIDENCE_STYLES,
-  formatCouncilConsensus,
-  councilLeaning,
 } from "@/lib/ui";
 
 type Props = {
@@ -25,8 +23,8 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 // The breakdown behind the table row's single Recommendation badge —
-// Quality, Risk, Confidence, PE/growth/dividend, the council's one-line
-// lean, bull case, and risk flags. Shared by the desktop hover panel
+// Quality, Risk, Confidence, PE/growth/dividend, bull case, and risk
+// flags. Shared by the desktop hover panel
 // (CandidateHoverPanel) and the table's click-to-expand row, so mobile and
 // desktop show identical detail through different entry points.
 export function CandidateDetailBody({ latest }: Props) {
@@ -56,13 +54,6 @@ export function CandidateDetailBody({ latest }: Props) {
         <Stat label="E. Growth" value={formatPercent(latest.earningsGrowth)} />
         <Stat label="Div Yield" value={formatPercent(latest.dividendYield)} />
       </div>
-
-      {latest.councilConsensus !== null && (
-        <p className="mt-4 text-sm text-gray-700 dark:text-gray-300">
-          Council {councilLeaning(latest.councilConsensus)} — {formatCouncilConsensus(latest.councilConsensus)}{" "}
-          favor entering.
-        </p>
-      )}
 
       <div className="mt-4">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">

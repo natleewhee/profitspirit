@@ -128,16 +128,6 @@ model Scorecard {
   fiftyDayAverage      Float?
   twoHundredDayAverage Float?
   nextEarningsDate     DateTime?
-  // Lynch's PEG check (trailing P/E ÷ EPS growth %) — deterministic, see
-  // council.ts computePegRatio.
-  pegRatio             Float?
-  // "Council of 5" — Buffett/Munger/Graham/Lynch/Damodaran each reacting to
-  // this scorecard's numbers (not independent research; see council.ts for
-  // why). Array of { name, verdict, reasoning }.
-  councilVerdicts      Json?
-  // 0-5 count of "enter" verdicts above, tallied in code — never an
-  // independent LLM summary, so it can't contradict the five verdicts.
-  councilConsensus     Int?
   // Hover-preview panel fields — all already fetched from Yahoo elsewhere in
   // the pipeline (trailingPE/forwardPE via marketData.ts, earningsGrowth via
   // fundamentalsData.ts) or cheap additions from modules already called
