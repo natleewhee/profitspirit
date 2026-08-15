@@ -174,6 +174,11 @@ export async function POST(
       pegRatio,
       councilVerdicts,
       councilConsensus,
+      trailingPE: market.found ? market.trailingPE : null,
+      forwardPE: market.found ? market.forwardPE : null,
+      earningsGrowth: fundamentals.found ? fundamentals.valuationInputs.earningsGrowth : null,
+      dividendYield: market.found ? market.dividendYield : null,
+      analystTargetPrice: fundamentals.found ? fundamentals.analystTargetPrice : null,
     },
   });
 

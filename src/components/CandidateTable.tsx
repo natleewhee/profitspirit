@@ -44,6 +44,7 @@ type Props = {
   onSort: (key: SortKey) => void;
   onDelete: (id: string) => void;
   onRunResearch: (id: string) => void;
+  onHover?: (id: string) => void;
 };
 
 function LivePriceChip({ quote }: { quote: LiveQuote | undefined }) {
@@ -132,6 +133,7 @@ export function CandidateTable({
   onSort,
   onDelete,
   onRunResearch,
+  onHover,
 }: Props) {
   // Score/gap/researched are only meaningful once a candidate has been
   // researched — rows with no scorecard always sort to the bottom
@@ -212,7 +214,11 @@ export function CandidateTable({
             const rowBorder = latest ? RECOMMENDATION_BORDER[latest.recommendation] : "border-l-gray-200";
 
             return (
-              <tr key={c.id} className={`border-l-4 ${rowBorder} ${isNew ? "bg-blue-50/60" : ""}`}>
+              <tr
+                key={c.id}
+                onMouseEnter={() => onHover?.(c.id)}
+                className={`border-l-4 ${rowBorder} ${isNew ? "bg-blue-50/60" : ""}`}
+              >
                 <td className="whitespace-nowrap px-3 py-2.5">
                   <Link
                     href={`/candidates/${c.id}`}

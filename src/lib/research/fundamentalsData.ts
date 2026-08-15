@@ -47,6 +47,10 @@ export type FundamentalsBundle = {
     // based, not guaranteed, hence still just one input among several.
     earningsGrowth: number | null;
   };
+  // Yahoo's analyst consensus 1-year price target — distinct from our own
+  // computed fairValueEstimate (valuation.ts), which is model-driven, not
+  // analyst-sourced. Both are shown side by side in the hover-preview panel.
+  analystTargetPrice: number | null;
   annualIncomeStatements: IncomeStatementPeriod[];
   quarterlyIncomeStatements: IncomeStatementPeriod[];
 } | {
@@ -124,6 +128,7 @@ export async function fetchFundamentalsData(ticker: string): Promise<Fundamental
         sharesOutstanding: summary.defaultKeyStatistics?.sharesOutstanding ?? null,
         earningsGrowth: summary.financialData?.earningsGrowth ?? null,
       },
+      analystTargetPrice: summary.financialData?.targetMeanPrice ?? null,
       annualIncomeStatements,
       quarterlyIncomeStatements,
     };

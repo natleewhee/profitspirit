@@ -138,6 +138,17 @@ model Scorecard {
   // 0-5 count of "enter" verdicts above, tallied in code — never an
   // independent LLM summary, so it can't contradict the five verdicts.
   councilConsensus     Int?
+  // Hover-preview panel fields — all already fetched from Yahoo elsewhere in
+  // the pipeline (trailingPE/forwardPE via marketData.ts, earningsGrowth via
+  // fundamentalsData.ts) or cheap additions from modules already called
+  // (dividendYield off the base quote, analystTargetPrice off financialData).
+  // Distinct from our own fairValueEstimate — this is Yahoo's analyst
+  // consensus, not our computed figure.
+  trailingPE           Float?
+  forwardPE            Float?
+  earningsGrowth       Float?
+  dividendYield        Float?
+  analystTargetPrice   Float?
   createdAt            DateTime         @default(now())
 
   @@index([candidateId])

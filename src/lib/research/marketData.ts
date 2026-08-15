@@ -20,6 +20,7 @@ export type MarketDataBundle = {
   // ±2 days per Yahoo's own accuracy caveat — good enough for "reports
   // soon" context, not exact.
   nextEarningsDate: string | null;
+  dividendYield: number | null;
   recentClose: { date: string; close: number }[];
 } | {
   found: false;
@@ -67,6 +68,7 @@ export async function fetchMarketData(ticker: string): Promise<MarketDataBundle>
       nextEarningsDate: quote.earningsTimestamp
         ? quote.earningsTimestamp.toISOString().slice(0, 10)
         : null,
+      dividendYield: quote.trailingAnnualDividendYield ?? null,
       recentClose,
     };
   } catch (err) {

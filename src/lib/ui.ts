@@ -241,6 +241,16 @@ export function councilConsensusStyles(consensus: number | null): string {
   return "bg-red-100 text-red-800";
 }
 
+// --- Hover-preview panel (PE, earnings growth, dividend yield, analyst target) ---
+export function formatPE(value: number | null): string {
+  return value === null ? "—" : value.toFixed(1);
+}
+
+// Yahoo returns these as decimals (0.15 = 15%), not whole percentages.
+export function formatPercent(value: number | null): string {
+  return value === null ? "—" : `${(value * 100).toFixed(1)}%`;
+}
+
 // --- Next earnings date ---
 export function formatEarningsProximity(iso: string | null): string | null {
   if (!iso) return null;

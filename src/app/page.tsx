@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CandidateWithLatest, LiveQuote } from "@/lib/types";
 import { Status, ValuationVerdict } from "@prisma/client";
 import { CandidateTable } from "@/components/CandidateTable";
+import { CandidateHoverPanel } from "@/components/CandidateHoverPanel";
 import { FilterBar, DEFAULT_FILTERS, Filters } from "@/components/FilterBar";
 import { AddCandidateModal } from "@/components/AddCandidateModal";
 import { WATCH_THRESHOLD } from "@/lib/research/score";
@@ -73,6 +74,7 @@ function DashboardContent() {
   const [runningIds, setRunningIds] = useState<Set<string>>(new Set());
   const [liveQuotes, setLiveQuotes] = useState<Record<string, LiveQuote>>(() => liveQuotesCache);
   const [loadError, setLoadError] = useState(false);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -233,6 +235,11 @@ function DashboardContent() {
     });
   }, [candidates, filters, onlyLatestScan, actionableOnly, latestDate]);
 
+  const hoveredCandidate = useMemo(
+    () => filtered.find((c) => c.id === hoveredId) ?? filtered[0] ?? null,
+    [filtered, hoveredId]
+  );
+
   const isFiltered =
     filters.q !== DEFAULT_FILTERS.q ||
     filters.verdict !== DEFAULT_FILTERS.verdict ||
@@ -337,18 +344,26 @@ function DashboardContent() {
         {initialLoading ? (
           <div className="p-10 text-center text-sm text-gray-600">Loading…</div>
         ) : (
-          <CandidateTable
-            candidates={filtered}
-            latestDate={latestDate}
-            runningIds={runningIds}
-            liveQuotes={liveQuotes}
-            isFiltered={isFiltered}
-            sortKey={sortKey}
-            sortAsc={sortAsc}
-            onSort={toggleSort}
-            onDelete={handleDelete}
-            onRunResearch={handleRunResearch}
-          />
+          <div className="flex items-start gap-4">
+            <div className="min-w-0 flex-1">
+              <CandidateTable
+                candidates={filtered}
+                latestDate={latestDate}
+                runningIds={runningIds}
+                liveQuotes={liveQuotes}
+                isFiltered={isFiltered}
+                sortKey={sortKey}
+                sortAsc={sortAsc}
+                onSort={toggleSort}
+                onDelete={handleDelete}
+                onRunResearch={handleRunResearch}
+                onHover={setHoveredId}
+              />
+            </div>
+            <div className="sticky top-20 hidden w-80 shrink-0 lg:block">
+              <CandidateHoverPanel candidate={hoveredCandidate} />
+            </div>
+          </div>
         )}
       </div>
     </main>

@@ -57,15 +57,22 @@ export type Scorecard = {
   pegRatio: number | null;
   councilVerdicts: CouncilVerdict[] | null;
   councilConsensus: number | null;
+  trailingPE: number | null;
+  forwardPE: number | null;
+  earningsGrowth: number | null;
+  dividendYield: number | null;
+  analystTargetPrice: number | null;
   createdAt: string;
 };
 
 export type CandidateWithScorecards = Candidate & { scorecards: Scorecard[] };
 
 // The narrow projection returned by GET /api/candidates for the dashboard
-// list — excludes the four long prose fields (fundamentalsSummary,
-// technicalsSummary, bullCase, bearCase), which don't belong in a list
-// payload. See docs/dashboard-ux-review.md §2.1.
+// list — excludes fundamentalsSummary/technicalsSummary/bearCase (long
+// prose not needed in a list payload). bullCase and riskFlags ARE included
+// despite being prose/array, since the hover-preview panel renders them
+// directly from this list payload without a second fetch. See
+// docs/dashboard-ux-review.md §2.1.
 export type ScorecardSummary = Pick<
   Scorecard,
   | "id"
@@ -94,6 +101,13 @@ export type ScorecardSummary = Pick<
   | "nextEarningsDate"
   | "pegRatio"
   | "councilConsensus"
+  | "trailingPE"
+  | "forwardPE"
+  | "earningsGrowth"
+  | "dividendYield"
+  | "analystTargetPrice"
+  | "bullCase"
+  | "riskFlags"
 >;
 
 // Latest-two scorecards (for the delta chip) plus a total count, attached

@@ -16,10 +16,10 @@ export async function GET(request: NextRequest) {
     orderBy: { dateScanned: "desc" },
     include: {
       // Latest 2 (not just 1) so the table can show a score delta vs the
-      // previous run. Deliberately `select`-ed, not a full `include` — the
-      // four prose fields (fundamentalsSummary, technicalsSummary,
-      // bullCase, bearCase) are kilobytes each and don't belong in a list
-      // payload. See docs/dashboard-ux-review.md §2.1.
+      // previous run. Deliberately `select`-ed, not a full `include` —
+      // fundamentalsSummary/technicalsSummary/bearCase are kilobytes each
+      // and don't belong in a list payload. bullCase is included since the
+      // hover-preview panel needs it. See docs/dashboard-ux-review.md §2.1.
       scorecards: {
         orderBy: { createdAt: "desc" },
         take: 2,
@@ -50,6 +50,13 @@ export async function GET(request: NextRequest) {
           nextEarningsDate: true,
           pegRatio: true,
           councilConsensus: true,
+          trailingPE: true,
+          forwardPE: true,
+          earningsGrowth: true,
+          dividendYield: true,
+          analystTargetPrice: true,
+          bullCase: true,
+          riskFlags: true,
         },
       },
       _count: { select: { scorecards: true } },
