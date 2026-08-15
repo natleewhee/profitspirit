@@ -4,6 +4,7 @@ import { VALUATION_VERDICT_LABELS } from "@/lib/labels";
 import { WATCH_THRESHOLD, RESEARCH_FURTHER_THRESHOLD } from "@/lib/research/score";
 
 export type ResearchStateFilter = "ALL" | "NEEDS" | "RESEARCHED" | "STALE";
+export const RESEARCH_STATE_VALUES: ResearchStateFilter[] = ["ALL", "NEEDS", "RESEARCHED", "STALE"];
 
 export type Filters = {
   q: string;
@@ -36,13 +37,13 @@ export function FilterBar({ filters, onChange, onReset, isFiltered }: Props) {
         placeholder="Search ticker…"
         value={filters.q}
         onChange={(e) => onChange({ q: e.target.value })}
-        className="w-36 rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+        className="w-36 rounded-md border border-gray-300 px-2 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
       />
 
       <label className="flex items-center gap-2 text-sm">
-        <span className="text-gray-600">Research</span>
+        <span className="text-gray-600 dark:text-gray-400">Research</span>
         <select
-          className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+          className="rounded-md border border-gray-300 px-2 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
           value={filters.research}
           onChange={(e) => onChange({ research: e.target.value as ResearchStateFilter })}
         >
@@ -54,9 +55,9 @@ export function FilterBar({ filters, onChange, onReset, isFiltered }: Props) {
       </label>
 
       <label className="flex items-center gap-2 text-sm">
-        <span className="text-gray-600">Verdict</span>
+        <span className="text-gray-600 dark:text-gray-400">Verdict</span>
         <select
-          className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+          className="rounded-md border border-gray-300 px-2 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
           value={filters.verdict}
           onChange={(e) => onChange({ verdict: e.target.value })}
         >
@@ -70,9 +71,9 @@ export function FilterBar({ filters, onChange, onReset, isFiltered }: Props) {
       </label>
 
       <label className="flex items-center gap-2 text-sm">
-        <span className="text-gray-600">Min score</span>
+        <span className="text-gray-600 dark:text-gray-400">Min score</span>
         <select
-          className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+          className="rounded-md border border-gray-300 px-2 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
           value={filters.minScore}
           onChange={(e) => onChange({ minScore: Number(e.target.value) })}
         >

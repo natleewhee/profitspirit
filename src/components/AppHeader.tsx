@@ -1,11 +1,12 @@
 import Link from "next/link";
+import { ThemeToggle } from "./ThemeToggle";
 
 // Persistent site chrome — previously there was no header at all, so the
 // page title lived inline in dashboard content and detail/edit pages had no
 // shared identity or navigation beyond a bare "← Back" link.
 export function AppHeader({ actions }: { actions?: React.ReactNode }) {
   return (
-    <header className="sticky top-0 z-40 border-b border-gray-200 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60">
+    <header className="sticky top-0 z-40 border-b border-gray-200 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:border-gray-800 dark:bg-gray-950/80">
       <div className="mx-auto flex h-14 max-w-[1800px] items-center gap-4 px-4 sm:px-6 lg:px-8">
         <Link
           href="/"
@@ -17,11 +18,14 @@ export function AppHeader({ actions }: { actions?: React.ReactNode }) {
             </svg>
           </span>
           <span className="text-base font-semibold tracking-tight">
-            <span className="text-gray-900">Profit</span>
+            <span className="text-gray-900 dark:text-gray-100">Profit</span>
             <span className="text-blue-600">Spirit</span>
           </span>
         </Link>
-        <div className="ml-auto flex items-center gap-2">{actions}</div>
+        <div className="ml-auto flex items-center gap-2">
+          {actions}
+          <ThemeToggle />
+        </div>
       </div>
     </header>
   );

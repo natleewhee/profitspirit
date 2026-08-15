@@ -14,35 +14,39 @@ import { WATCH_THRESHOLD, RESEARCH_FURTHER_THRESHOLD } from "@/lib/research/scor
 import { computeValuationGapPct } from "@/lib/research/gap";
 import { deriveRiskLevel } from "@/lib/research/risk";
 
+// dark: variants use the *-500/15 background + *-300 text pattern
+// throughout this file, never *-900 background with *-800 text — that
+// pairing is the exact low-contrast failure mode from the original
+// forced-dark-mode bug (see docs/dashboard-ux-review.md Phase 4).
 export const CONFIDENCE_STYLES: Record<ConfidenceRead, string> = {
-  LOW: "bg-gray-200 text-gray-800",
-  MEDIUM: "bg-amber-100 text-amber-800",
-  HIGH: "bg-green-100 text-green-800",
+  LOW: "bg-gray-200 text-gray-800 dark:bg-gray-500/15 dark:text-gray-300",
+  MEDIUM: "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300",
+  HIGH: "bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300",
 };
 
 export const RECOMMENDATION_BORDER: Record<Recommendation, string> = {
   WATCH: "border-l-blue-500",
   RESEARCH_FURTHER: "border-l-purple-500",
-  PASS: "border-l-gray-400",
+  PASS: "border-l-gray-400 dark:border-l-gray-600",
 };
 
 export const DATA_QUALITY_STYLES: Record<DataQuality, string> = {
-  THIN: "bg-red-50 text-red-700",
-  ADEQUATE: "bg-slate-100 text-slate-700",
-  RICH: "bg-slate-100 text-slate-700",
+  THIN: "bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-300",
+  ADEQUATE: "bg-slate-100 text-slate-700 dark:bg-slate-500/15 dark:text-slate-300",
+  RICH: "bg-slate-100 text-slate-700 dark:bg-slate-500/15 dark:text-slate-300",
 };
 
 export const RISK_LEVEL_STYLES: Record<RiskLevel, string> = {
-  LOW: "bg-green-100 text-green-800",
-  MEDIUM: "bg-amber-100 text-amber-800",
-  HIGH: "bg-red-100 text-red-800",
+  LOW: "bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300",
+  MEDIUM: "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300",
+  HIGH: "bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-300",
 };
 
 export const VALUATION_VERDICT_STYLES: Record<ValuationVerdict, string> = {
-  UNDERVALUED: "bg-green-100 text-green-800",
-  OVERVALUED: "bg-red-100 text-red-800",
-  FAIRLY_VALUED: "bg-blue-100 text-blue-800",
-  INSUFFICIENT_DATA: "bg-gray-200 text-gray-800",
+  UNDERVALUED: "bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300",
+  OVERVALUED: "bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-300",
+  FAIRLY_VALUED: "bg-blue-100 text-blue-800 dark:bg-blue-500/15 dark:text-blue-300",
+  INSUFFICIENT_DATA: "bg-gray-200 text-gray-800 dark:bg-gray-500/15 dark:text-gray-300",
 };
 
 // "Bucket" mirrors deriveRecommendation()'s thresholds so a bare score (no
@@ -55,10 +59,10 @@ export function scoreBucket(score: number | null): "good" | "mid" | "bad" | "non
 }
 
 const SCORE_BUCKET_STYLES: Record<ReturnType<typeof scoreBucket>, string> = {
-  good: "bg-green-100 text-green-800",
-  mid: "bg-amber-100 text-amber-800",
-  bad: "bg-red-100 text-red-800",
-  none: "bg-gray-200 text-gray-700",
+  good: "bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300",
+  mid: "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300",
+  bad: "bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-300",
+  none: "bg-gray-200 text-gray-700 dark:bg-gray-500/15 dark:text-gray-300",
 };
 
 export function scoreStyles(score: number | null): string {
@@ -131,9 +135,9 @@ export function stalenessLevel(iso: string): "fresh" | "aging" | "stale" {
 }
 
 export const STALENESS_TEXT_STYLES: Record<ReturnType<typeof stalenessLevel>, string> = {
-  fresh: "text-gray-600",
-  aging: "text-amber-700",
-  stale: "text-red-700",
+  fresh: "text-gray-600 dark:text-gray-400",
+  aging: "text-amber-700 dark:text-amber-400",
+  stale: "text-red-700 dark:text-red-400",
 };
 
 // Past 30 days, the valuation cell (verdict + gap) is dimmed and gets a
@@ -235,10 +239,10 @@ export function formatCouncilConsensus(consensus: number | null): string {
 }
 
 export function councilConsensusStyles(consensus: number | null): string {
-  if (consensus === null) return "bg-gray-200 text-gray-700";
-  if (consensus >= 3) return "bg-green-100 text-green-800";
-  if (consensus === 2) return "bg-amber-100 text-amber-800";
-  return "bg-red-100 text-red-800";
+  if (consensus === null) return "bg-gray-200 text-gray-700 dark:bg-gray-500/15 dark:text-gray-300";
+  if (consensus >= 3) return "bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300";
+  if (consensus === 2) return "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300";
+  return "bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-300";
 }
 
 // --- Hover-preview panel (PE, earnings growth, dividend yield, analyst target) ---
@@ -250,6 +254,11 @@ export function formatPE(value: number | null): string {
 export function formatPercent(value: number | null): string {
   return value === null ? "—" : `${(value * 100).toFixed(1)}%`;
 }
+
+// Single copy for the "run research" busy state — previously three
+// slightly different strings across CandidateTable and ResearchPanel. See
+// docs/dashboard-ux-review.md A14/C4.
+export const RUNNING_RESEARCH_LABEL = "Running… (up to a minute)";
 
 // --- Next earnings date ---
 export function formatEarningsProximity(iso: string | null): string | null {

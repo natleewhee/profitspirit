@@ -19,14 +19,23 @@ export const metadata: Metadata = {
   description: "Weekly stock scan candidate tracker",
 };
 
-// This app is light-mode-only today. Without this, browsers that force dark
-// mode on pages with no declared color-scheme invert the background but
-// leave authored text colors alone — producing dark-gray-on-near-black text
-// that's barely legible (exactly what shows up on a device/browser set to
-// dark mode).
+// Now that the app authors real dark-mode colors (dark: variants across
+// every component, see docs/dashboard-ux-review.md Phase 4), "light dark"
+// is correct — the old "light" pin was a patch for a different bug (forced
+// dark inverting a page with no authored dark colors) that no longer
+// applies once a real theme exists.
 export const viewport: Viewport = {
-  colorScheme: "light",
+  colorScheme: "light dark",
 };
+
+// Blocking script so the theme class is set before first paint — otherwise
+// a dark-preferring browser flashes light, then flips dark on hydration.
+const THEME_INIT_SCRIPT = `try {
+  var t = localStorage.getItem('theme');
+  if (t === 'dark' || (!t && matchMedia('(prefers-color-scheme: dark)').matches)) {
+    document.documentElement.classList.add('dark');
+  }
+} catch (e) {}`;
 
 export default function RootLayout({
   children,
@@ -34,9 +43,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} bg-white font-sans text-gray-900 antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} bg-white font-sans text-gray-900 antialiased dark:bg-gray-950 dark:text-gray-100`}
       >
         <AppHeader />
         {children}

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo } from "react";
 import { CandidateWithLatest, LiveQuote } from "@/lib/types";
 import { ConfidenceRead } from "@prisma/client";
 import { STATUS_LABELS, VALUATION_VERDICT_LABELS } from "@/lib/labels";
@@ -28,6 +29,7 @@ import {
   formatEarningsProximity,
   formatCouncilConsensus,
   councilConsensusStyles,
+  RUNNING_RESEARCH_LABEL,
 } from "@/lib/ui";
 import { computeValuationGapPct } from "@/lib/research/gap";
 import { deriveRiskLevel } from "@/lib/research/risk";
@@ -51,11 +53,11 @@ function LivePriceChip({ quote }: { quote: LiveQuote | undefined }) {
   if (!quote || quote.regularMarketPrice === null) return null;
 
   const up = (quote.regularMarketChangePercent ?? 0) >= 0;
-  const changeColor = up ? "text-green-700" : "text-red-700";
+  const changeColor = up ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400";
 
   return (
     <div>
-      <span className="font-semibold text-gray-900">{formatPrice(quote.regularMarketPrice)}</span>{" "}
+      <span className="font-semibold text-gray-900 dark:text-gray-100">{formatPrice(quote.regularMarketPrice)}</span>{" "}
       {quote.regularMarketChangePercent !== null && (
         <span className={`text-xs font-medium ${changeColor}`}>
           {up ? "+" : ""}
@@ -63,10 +65,10 @@ function LivePriceChip({ quote }: { quote: LiveQuote | undefined }) {
         </span>
       )}
       {quote.prePostLabel && quote.prePostPrice !== null && (
-        <div className="text-xs text-gray-500">
+        <div className="text-xs text-gray-500 dark:text-gray-400">
           {quote.prePostLabel}: {formatPrice(quote.prePostPrice)}
           {quote.prePostChangePercent !== null && (
-            <span className={quote.prePostChangePercent >= 0 ? "text-green-700" : "text-red-700"}>
+            <span className={quote.prePostChangePercent >= 0 ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}>
               {" "}
               {quote.prePostChangePercent >= 0 ? "+" : ""}
               {quote.prePostChangePercent.toFixed(2)}%
@@ -87,7 +89,7 @@ function ConfidenceDots({ confidence }: { confidence: ConfidenceRead }) {
       {[1, 2, 3].map((i) => (
         <span
           key={i}
-          className={`h-1.5 w-1.5 rounded-full ${i <= filled ? "bg-gray-700" : "bg-gray-300"}`}
+          className={`h-1.5 w-1.5 rounded-full ${i <= filled ? "bg-gray-700 dark:bg-gray-300" : "bg-gray-300 dark:bg-gray-600"}`}
         />
       ))}
     </span>
@@ -102,7 +104,7 @@ function RiskDots({ riskScore }: { riskScore: number | null }) {
       {[1, 2, 3, 4, 5].map((i) => (
         <span
           key={i}
-          className={`h-1.5 w-1.5 rounded-full ${i <= filled ? RISK_SCORE_DOT_STYLES[level] : "bg-gray-300"}`}
+          className={`h-1.5 w-1.5 rounded-full ${i <= filled ? RISK_SCORE_DOT_STYLES[level] : "bg-gray-300 dark:bg-gray-600"}`}
         />
       ))}
     </span>
@@ -112,10 +114,10 @@ function RiskDots({ riskScore }: { riskScore: number | null }) {
 function DeltaChip({ latest, previous }: { latest: number | null; previous: number | null }) {
   if (latest === null || previous === null) return null;
   const diff = latest - previous;
-  if (diff === 0) return <span className="text-xs text-gray-500">→ 0</span>;
+  if (diff === 0) return <span className="text-xs text-gray-500 dark:text-gray-400">→ 0</span>;
   const up = diff > 0;
   return (
-    <span className={`text-xs font-medium ${up ? "text-green-700" : "text-red-700"}`}>
+    <span className={`text-xs font-medium ${up ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}`}>
       {up ? "▲" : "▼"} {up ? "+" : ""}
       {diff}
     </span>
@@ -138,55 +140,61 @@ export function CandidateTable({
   // Score/gap/researched are only meaningful once a candidate has been
   // researched — rows with no scorecard always sort to the bottom
   // regardless of direction, so they never scatter through a ranked list.
-  const sorted = [...candidates].sort((a, b) => {
-    if (sortKey === "score" || sortKey === "gap" || sortKey === "researched") {
-      const aLatest = a.scorecards[0] ?? null;
-      const bLatest = b.scorecards[0] ?? null;
-      if (!aLatest && !bLatest) return 0;
-      if (!aLatest) return 1;
-      if (!bLatest) return -1;
+  // Memoized so the 60-second live-quote poll (which changes an unrelated
+  // prop) doesn't re-sort the whole table on every tick.
+  const sorted = useMemo(
+    () =>
+      [...candidates].sort((a, b) => {
+        if (sortKey === "score" || sortKey === "gap" || sortKey === "researched") {
+          const aLatest = a.scorecards[0] ?? null;
+          const bLatest = b.scorecards[0] ?? null;
+          if (!aLatest && !bLatest) return 0;
+          if (!aLatest) return 1;
+          if (!bLatest) return -1;
 
-      let cmp = 0;
-      if (sortKey === "score") {
-        cmp = (aLatest.recommendationScore ?? -1) - (bLatest.recommendationScore ?? -1);
-      } else if (sortKey === "gap") {
-        const aGap = computeValuationGapPct(aLatest.currentPrice, aLatest.fairValueEstimate);
-        const bGap = computeValuationGapPct(bLatest.currentPrice, bLatest.fairValueEstimate);
-        cmp = (aGap ?? -Infinity) - (bGap ?? -Infinity);
-      } else {
-        cmp = new Date(aLatest.createdAt).getTime() - new Date(bLatest.createdAt).getTime();
-      }
-      return sortAsc ? cmp : -cmp;
-    }
+          let cmp = 0;
+          if (sortKey === "score") {
+            cmp = (aLatest.recommendationScore ?? -1) - (bLatest.recommendationScore ?? -1);
+          } else if (sortKey === "gap") {
+            const aGap = computeValuationGapPct(aLatest.currentPrice, aLatest.fairValueEstimate);
+            const bGap = computeValuationGapPct(bLatest.currentPrice, bLatest.fairValueEstimate);
+            cmp = (aGap ?? -Infinity) - (bGap ?? -Infinity);
+          } else {
+            cmp = new Date(aLatest.createdAt).getTime() - new Date(bLatest.createdAt).getTime();
+          }
+          return sortAsc ? cmp : -cmp;
+        }
 
-    let cmp = 0;
-    if (sortKey === "dateScanned") {
-      cmp = new Date(a.dateScanned).getTime() - new Date(b.dateScanned).getTime();
-    } else {
-      cmp = a[sortKey].localeCompare(b[sortKey]);
-    }
-    return sortAsc ? cmp : -cmp;
-  });
+        let cmp = 0;
+        if (sortKey === "dateScanned") {
+          cmp = new Date(a.dateScanned).getTime() - new Date(b.dateScanned).getTime();
+        } else {
+          cmp = a[sortKey].localeCompare(b[sortKey]);
+        }
+        return sortAsc ? cmp : -cmp;
+      }),
+    [candidates, sortKey, sortAsc]
+  );
 
   if (candidates.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-gray-300 p-10 text-center text-sm text-gray-600">
+      <div className="rounded-lg border border-dashed border-gray-300 p-10 text-center text-sm text-gray-600 dark:border-gray-700 dark:text-gray-400">
         {isFiltered ? "No candidates match these filters." : "No candidates yet — add one to get started."}
       </div>
     );
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-gray-200">
-      <table className="w-full min-w-full divide-y divide-gray-200 text-sm">
-        <thead className="bg-gray-50">
+    <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-800">
+      <table className="w-full min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
+        <thead className="bg-gray-50 dark:bg-gray-800/50">
           <tr>
             <Th sortKey="ticker" activeKey={sortKey} asc={sortAsc} onSort={onSort}>
               Ticker
             </Th>
-            <th className="px-3 py-2.5 text-left font-medium text-gray-600">
+            <th className="px-3 py-2.5 text-left font-medium text-gray-600 dark:text-gray-400">
               Price
-              <div className="text-[11px] font-normal normal-case text-gray-500">live / at research</div>
+              <div className="text-[11px] font-normal normal-case text-gray-500 dark:text-gray-400">live / at research</div>
             </th>
             <Th sortKey="gap" activeKey={sortKey} asc={sortAsc} onSort={onSort}>
               Intrinsic value
@@ -194,16 +202,16 @@ export function CandidateTable({
             <Th sortKey="score" activeKey={sortKey} asc={sortAsc} onSort={onSort}>
               Score
             </Th>
-            <th className="px-3 py-2.5 text-left font-medium text-gray-600">Quality</th>
-            <th className="px-3 py-2.5 text-left font-medium text-gray-600">Risk</th>
-            <th className="px-3 py-2.5 text-left font-medium text-gray-600">Entry zone</th>
+            <th className="px-3 py-2.5 text-left font-medium text-gray-600 dark:text-gray-400">Quality</th>
+            <th className="px-3 py-2.5 text-left font-medium text-gray-600 dark:text-gray-400">Risk</th>
+            <th className="px-3 py-2.5 text-left font-medium text-gray-600 dark:text-gray-400">Entry zone</th>
             <Th sortKey="researched" activeKey={sortKey} asc={sortAsc} onSort={onSort}>
               Researched
             </Th>
             <th className="px-3 py-2.5" />
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-100 bg-white">
+        <tbody className="divide-y divide-gray-100 bg-white dark:divide-gray-800 dark:bg-gray-900">
           {sorted.map((c) => {
             const isNew = latestDate && c.dateScanned.slice(0, 10) === latestDate.slice(0, 10);
             const latest = c.scorecards[0];
@@ -211,18 +219,18 @@ export function CandidateTable({
             const running = runningIds.has(c.id);
             const liveQuote = liveQuotes[c.ticker];
 
-            const rowBorder = latest ? RECOMMENDATION_BORDER[latest.recommendation] : "border-l-gray-200";
+            const rowBorder = latest ? RECOMMENDATION_BORDER[latest.recommendation] : "border-l-gray-200 dark:border-l-gray-700";
 
             return (
               <tr
                 key={c.id}
                 onMouseEnter={() => onHover?.(c.id)}
-                className={`border-l-4 ${rowBorder} ${isNew ? "bg-blue-50/60" : ""}`}
+                className={`border-l-4 ${rowBorder} ${isNew ? "bg-blue-50/60 dark:bg-blue-500/10" : ""}`}
               >
                 <td className="whitespace-nowrap px-3 py-2.5">
                   <Link
                     href={`/candidates/${c.id}`}
-                    className="rounded font-semibold text-gray-900 hover:text-blue-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+                    className="rounded font-semibold text-gray-900 dark:text-gray-100 hover:text-blue-700 dark:hover:text-blue-400 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
                   >
                     {c.ticker}
                   </Link>
@@ -232,7 +240,7 @@ export function CandidateTable({
                     </span>
                   )}
                   <div className="mt-0.5">
-                    <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[11px] font-medium text-gray-600">
+                    <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[11px] font-medium text-gray-600 dark:bg-gray-500/15 dark:text-gray-300">
                       {STATUS_LABELS[c.status]}
                     </span>
                   </div>
@@ -243,7 +251,7 @@ export function CandidateTable({
                 </td>
 
                 {c.scorecardCount === 0 ? (
-                  <td colSpan={7} className="px-3 py-2.5 text-gray-600">
+                  <td colSpan={7} className="px-3 py-2.5 text-gray-600 dark:text-gray-400">
                     <div className="flex items-center gap-3">
                       <span>Not researched yet</span>
                       <button
@@ -251,7 +259,7 @@ export function CandidateTable({
                         disabled={running}
                         className="rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
                       >
-                        {running ? "Running… (up to a minute)" : "Run research"}
+                        {running ? RUNNING_RESEARCH_LABEL : "Run research"}
                       </button>
                     </div>
                   </td>
@@ -259,18 +267,18 @@ export function CandidateTable({
                   <>
                     <td className="whitespace-nowrap px-3 py-2.5">
                       <LivePriceChip quote={liveQuote} />
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
                         {formatPrice(latest.currentPrice)} at research
                       </div>
                       {format52WeekPosition(latest.currentPrice, latest.fiftyTwoWeekLow, latest.fiftyTwoWeekHigh) && (
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
                           {format52WeekPosition(latest.currentPrice, latest.fiftyTwoWeekLow, latest.fiftyTwoWeekHigh)}
                           {formatTrend(latest.currentPrice, latest.fiftyDayAverage, latest.twoHundredDayAverage) &&
                             ` · ${formatTrend(latest.currentPrice, latest.fiftyDayAverage, latest.twoHundredDayAverage)}`}
                         </div>
                       )}
                       {formatEarningsProximity(latest.nextEarningsDate) && (
-                        <div className="text-xs font-medium text-amber-700">
+                        <div className="text-xs font-medium text-amber-700 dark:text-amber-400">
                           {formatEarningsProximity(latest.nextEarningsDate)}
                         </div>
                       )}
@@ -279,14 +287,14 @@ export function CandidateTable({
                       className={`whitespace-nowrap px-3 py-2.5 ${VALUATION_CELL_OPACITY[stalenessLevel(latest.createdAt)]}`}
                       title={formatAsOfTooltip(latest.createdAt)}
                     >
-                      <div className="font-semibold tabular-nums text-gray-900">
+                      <div className="font-semibold tabular-nums text-gray-900 dark:text-gray-100">
                         {formatPrice(latest.fairValueEstimate)}
                       </div>
                       <div
                         className={`text-xs font-medium tabular-nums ${
                           (computeValuationGapPct(latest.currentPrice, latest.fairValueEstimate) ?? 0) >= 0
-                            ? "text-green-700"
-                            : "text-red-700"
+                            ? "text-green-700 dark:text-green-400"
+                            : "text-red-700 dark:text-red-400"
                         }`}
                       >
                         {formatGap(latest.currentPrice, latest.fairValueEstimate)}
@@ -303,7 +311,7 @@ export function CandidateTable({
                       >
                         {latest.recommendationScore ?? "—"}
                       </div>
-                      <div className="mt-1 h-1 w-16 rounded-full bg-gray-200">
+                      <div className="mt-1 h-1 w-16 rounded-full bg-gray-200 dark:bg-gray-700">
                         <div
                           className={`h-1 rounded-full ${scoreBarStyle(latest.recommendationScore)}`}
                           style={{ width: `${Math.min(100, Math.max(0, latest.recommendationScore ?? 0))}%` }}
@@ -320,7 +328,7 @@ export function CandidateTable({
                       >
                         {latest.qualityScore ?? "—"}
                       </div>
-                      <div className="mt-1 h-1 w-16 rounded-full bg-gray-200">
+                      <div className="mt-1 h-1 w-16 rounded-full bg-gray-200 dark:bg-gray-700">
                         <div
                           className={`h-1 rounded-full ${qualityBarStyle(latest.qualityScore)}`}
                           style={{ width: `${Math.min(100, Math.max(0, latest.qualityScore ?? 0))}%` }}
@@ -334,10 +342,10 @@ export function CandidateTable({
                       </div>
                     </td>
                     <td className="whitespace-nowrap px-3 py-2.5">
-                      <div className="text-gray-900">
+                      <div className="text-gray-900 dark:text-gray-100">
                         {formatEntryZone(latest.entryZoneLow, latest.entryZoneHigh)}
                       </div>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
                         {formatEntryDistance(
                           liveQuote?.regularMarketPrice ?? latest.currentPrice,
                           latest.entryZoneLow,
@@ -360,7 +368,7 @@ export function CandidateTable({
                       >
                         {formatRelativeDate(latest.createdAt)}
                       </time>
-                      <span className="block text-[11px] text-gray-500">
+                      <span className="block text-[11px] text-gray-500 dark:text-gray-400">
                         {formatDateTime(latest.createdAt)}
                       </span>
                     </td>
@@ -375,18 +383,21 @@ export function CandidateTable({
                         disabled={running}
                         className="text-blue-600 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50"
                       >
-                        {running ? "Running…" : "Re-research"}
+                        {running ? RUNNING_RESEARCH_LABEL : "Re-research"}
                       </button>
                     )}
                     <Link
                       href={`/candidates/${c.id}/edit`}
-                      className="text-gray-600 hover:text-gray-900 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+                      aria-disabled={running}
+                      onClick={(e) => running && e.preventDefault()}
+                      className="text-gray-600 hover:text-gray-900 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 aria-disabled:pointer-events-none aria-disabled:opacity-50 dark:text-gray-400 dark:hover:text-gray-100"
                     >
                       Edit
                     </Link>
                     <button
                       onClick={() => onDelete(c.id)}
-                      className="text-gray-400 hover:text-red-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+                      disabled={running}
+                      className="text-gray-400 hover:text-red-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50 dark:text-gray-500 dark:hover:text-red-400"
                     >
                       Delete
                     </button>
@@ -419,14 +430,14 @@ function Th({
   return (
     <th
       scope="col"
-      className="px-3 py-2.5 text-left font-medium text-gray-600"
+      className="px-3 py-2.5 text-left font-medium text-gray-600 dark:text-gray-400"
       aria-sort={active ? (asc ? "ascending" : "descending") : "none"}
     >
       <button
         type="button"
         onClick={() => onSort(sortKey)}
-        className={`flex items-center gap-1 whitespace-nowrap rounded hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${
-          active ? "font-semibold text-gray-900" : ""
+        className={`flex items-center gap-1 whitespace-nowrap rounded hover:text-gray-900 dark:hover:text-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${
+          active ? "font-semibold text-gray-900 dark:text-gray-100" : ""
         }`}
       >
         {children}
